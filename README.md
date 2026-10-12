@@ -9,7 +9,7 @@ Projeto desenvolvido para a spaceweek.
 - **Diâmetro esperado**: 66mm (máximo de 66.3mm)
 - **Altura**: 230mm (CanSat 2U) ou 115mm (2 CanSat 1U)
 - **Mecânica**: Componentes e estrutura com resistência a vibrações durante o lançamento no foguete.
-- **Telemetria**: Transmitir com sucesso os [dados](#formato-do-pacote-de-telemetria) para a estação base via LoRa.
+- **Telemetria**: Transmitir com sucesso os [dados](#formato-do-pacote-de-telemetria) para a estação base via LoRa em 915MHz.
 - **Missão**: Avaliação das anomalias magnéticas no Atlântico Sul.
 
 ## Etapas a serem feitas
@@ -37,7 +37,7 @@ Preencher com x o que for concluído.
 | **EPS** | Bateria | [NCR18650B](./Documentos/EPS/NCR18650_Datasheet_1.pdf) (Panasonic) |
 | **EPS** | Regulador de tensão | [134N3P](./Documentos/EPS/134N3P_Datasheet.pdf) ([HT4928S](./Documentos/EPS/HT4928S_Datasheet.pdf)) ou [SX1308](./Documentos/EPS/SX1308_Datasheet.pdf) |
 | **EPS** | Carregador | [134N3P](./Documentos/EPS/134N3P_Datasheet.pdf) ([HT4928S](./Documentos/EPS/HT4928S_Datasheet.pdf)) |
-| **TT&C** | Módulo LoRa | [SX1278](./Documentos/TT&C/SX1278_chip_Datasheet.pdf) [RA-02](./Documentos/TT&C/SX1278_RA02_SMD_Datasheet.pdf) |
+| **TT&C** | Módulo LoRa | [SX1276](./Documentos/TT&C/SX1276_chip_Datasheet.pdf) [SMD](./Documentos/TT&C/SX1276_SMD_Datasheet.pdf) |
 
 O datasheet de cada componente pode ser encontrado na pasta de Documentos/{subsistema}/{componente} ou clicando em seu nome na tabela acima.
 Mudanças feitas em relação ao CubeSat 1U Galeoerdo:
@@ -45,7 +45,7 @@ Mudanças feitas em relação ao CubeSat 1U Galeoerdo:
 - Módulo leitor de cartão microSD genérico $\rightarrow$ [W25Q128](./Documentos/OBDH/W25Q128FV_chip_Datasheet.pdf)
 - Regulador de tensão [MT3608](./Documentos/EPS/MT3608_chip_Datasheet.pdf) $\rightarrow$ [134N3P](./Documentos/EPS/134N3P_Datasheet.pdf) [HT4928S](./Documentos/EPS/HT4928S_Datasheet.pdf)
 - Carregador [TP4056](./Documentos/EPS/TP4056_chip_Datasheet.pdf) $\rightarrow$ [134N3P](./Documentos/EPS/134N3P_Datasheet.pdf) [HT4928S](./Documentos/EPS/HT4928S_Datasheet.pdf)
-- Adição do módulo LoRa [SX1278](./Documentos/TT&C/SX1278_chip_Datasheet.pdf) [RA-02](./Documentos/TT&C/SX1278_RA02_SMD_Datasheet.pdf)
+- Adição do módulo LoRa [SX1276](./Documentos/TT&C/SX1276_chip_Datasheet.pdf) [SMD](./Documentos/TT&C/SX1276_SMD_Datasheet.pdf)
 
 ## Formato do Pacote de Telemetria
 `ainda a ser decidido`
