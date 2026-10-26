@@ -1,0 +1,4 @@
+.pio/
+.vscode/
+*.csv
+__pycache__/
