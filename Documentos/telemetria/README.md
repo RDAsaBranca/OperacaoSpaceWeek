@@ -3,8 +3,8 @@
 Um único projeto PlatformIO com dois firmwares e duas ferramentas para o PC:
 
 - **foguete** (ESP32-C3 SuperMini): lê BMP280, BNO055, GPS ATGM336H e bateria a 50 Hz, estima a fase do voo, grava tudo na flash W25Q128 e transmite telemetria pelo SX1276 a 5 Hz.
-- **base** (ESP32): recebe por interrupção, valida o pacote (CRC do LoRa + CRC próprio), conta perdas e envia pela USB em CSV, com RSSI, SNR e alertas.
-- **ferramentas/registrar_serial.py**: grava no PC o que a base recebe durante o voo.
+- **base** (ESP32 + SX1276, nada mais): recebe, valida (CRC do LoRa + CRC próprio) e conta perdas. Também cria a própria rede Wi-Fi e serve um **dashboard** que abre no navegador de qualquer celular ou notebook, sem internet. Pelo dashboard dá para acompanhar o voo ao vivo e gravar os dados na memória da base quando for pedido.
+- **ferramentas/registrar_serial.py** (opcional): grava no PC a cópia que a base também envia pela USB.
 - **ferramentas/baixar_flash.py**: depois do voo, baixa o registro completo da flash do foguete.
 
 ## Componentes da missão
@@ -42,12 +42,20 @@ telemetria-foguete/
 │   ├── registro_voo.*        caixa-preta: grava o voo na flash
 │   └── comandos.*            comandos pela USB (info, baixar, apagar)
 ├── src/base/                 ESP32
-│   ├── main.cpp              recepção, contagem de perdas, alerta sem sinal
+│   ├── main.cpp              inicia a memória, o Wi-Fi e a tarefa do rádio
+│   ├── config_base.h         nome e senha do Wi-Fi, histórico, modo simulação
 │   ├── pinos.h
 │   ├── radio_rx.*            recepção LoRa por interrupção
-│   └── saida.*               CSV + resumo legível com orientação e alertas
+│   ├── recepcao.*            tarefa do rádio: valida, conta perdas, simulação
+│   ├── servidor_web.*        rede Wi-Fi própria, dashboard e API
+│   ├── gravacao.*            gravação sob demanda na memória interna
+│   ├── saida.*               cópia em texto pela USB
+│   └── dashboard_html.h      GERADO a partir de web/dashboard.html
+├── web/
+│   └── dashboard.html        o dashboard (HTML, CSS e JavaScript num arquivo só)
 └── ferramentas/
-    ├── registrar_serial.py   grava a telemetria recebida pela base
+    ├── gerar_dashboard.py    embute o dashboard no firmware (roda sozinho)
+    ├── registrar_serial.py   grava a cópia USB da base no PC (opcional)
     └── baixar_flash.py       baixa a flash do foguete após o voo
 ```
 
@@ -117,6 +125,7 @@ O LoRa sempre perde alguns pacotes, então o foguete grava tudo na W25Q128:
 - Pré-disparo: os 0,5 s anteriores à detecção do lançamento também são gravados, para não perder o início da queima.
 - Cada registro tem 64 bytes: o pacote completo, a pressão bruta e o número da sessão. A sessão aumenta cada vez que o foguete liga, então um reinício no ar não apaga nada.
 - A gravação só acrescenta, nunca sobrescreve. Cabem cerca de 87 minutos a 50 Hz.
+- O driver (`flash_w25q.*`) segue o datasheet do W25Q128FV: instruções SPI padrão em modo 0 a 8 MHz, endereço de 3 bytes, gravação em páginas de 256 bytes sem cruzar o limite da página. Ao ligar, ele desfaz qualquer proteção de escrita que o chip tenha (bits BP, TB, SEC, CMP e WPS) e confere cada gravação lendo de volta, porque o chip ignora em silêncio a gravação em área protegida.
 
 Comandos pela USB do foguete (monitor serial a 115200, só funcionam no solo):
 
@@ -146,13 +155,46 @@ pio device monitor -e base       vê a telemetria chegando
 
 Na primeira gravação da C3 SuperMini, se ela não for reconhecida: segure o botão BOOT, conecte o USB (ou aperte RESET) e solte o BOOT.
 
-Para gravar a telemetria recebida pela base durante o voo:
 
-```
-pip install pyserial
-python ferramentas/registrar_serial.py COM5          (Windows)
-python ferramentas/registrar_serial.py /dev/ttyUSB0  (Linux)
-```
+## Estação base e dashboard
+
+![Dashboard da estação base](docs/dashboard.png)
+
+A base funciona só com a ESP32 e o SX1276. Ela cria uma rede Wi-Fi própria; não precisa de internet, roteador nem programa instalado.
+
+1. Ligue a base (pela USB ou por uma power bank).
+2. No celular ou notebook, conecte na rede **EstacaoBase-Foguete** (senha `foguete123`; troque em `src/base/config_base.h` antes da missão).
+3. Abra **http://192.168.4.1** no navegador.
+
+Se o Android avisar que a rede "não tem internet", escolha manter a conexão. Até 4 aparelhos podem acompanhar ao mesmo tempo.
+
+O dashboard mostra:
+
+- a fase do voo (rampa, subida, descida, pousado) e a altitude num altímetro com a marca da máxima;
+- a velocidade vertical e o tempo desde o lançamento;
+- a qualidade do sinal: intensidade (RSSI), relação sinal-ruído, folga até o limite do receptor e pacotes perdidos;
+- gráficos de altitude, velocidade, aceleração e sinal (últimos 2 minutos ou o voo todo);
+- a posição GPS, com a trajetória vista de cima, a distância da rampa e links para abrir no app de mapas;
+- a atitude do BNO055 e o nível de calibração;
+- o estado de cada sistema do foguete e alertas em destaque: sem sinal (com a última posição), bateria baixa, sensor com falha, flash parada.
+
+Quem abre o dashboard no meio do voo recebe os últimos 2 minutos que a base guarda na memória.
+
+**Salvar os dados**, de duas formas:
+
+- **Gravação na estação base:** os botões "Iniciar gravação" e "Parar gravação" guardam os pacotes na memória interna da ESP32 (cerca de 80 minutos a 5 Hz). A gravação continua mesmo se o celular desconectar ou a tela apagar. Depois de parar, "Baixar CSV" entrega o arquivo com a hora UTC de cada pacote (a base acerta o relógio pelo celular) e "Apagar gravação" libera o espaço.
+- **Baixar dados desta tela:** salva no aparelho tudo o que a página recebeu desde que foi aberta. Serve de reserva se ninguém lembrou de iniciar a gravação.
+
+Por dentro, a base roda duas tarefas em paralelo:
+
+- uma, de prioridade alta, só lê o rádio, para nenhum pacote se perder durante um download;
+- outra cuida do Wi-Fi, do dashboard e da gravação.
+
+O dashboard pede os dados novos 4 vezes por segundo pela rota `/api/dados`. A base continua enviando uma cópia em texto pela USB, então o `registrar_serial.py` ainda funciona como reserva.
+
+**Testar sem foguete:** com `-DSIMULAR_FOGUETE=1` no `[env:base]` do `platformio.ini`, a base gera um voo fictício (até ~850 m, com paraquedas e vento). Dá para testar o dashboard só com a ESP32, sem nem o módulo LoRa.
+
+**Mudar o visual:** edite `web/dashboard.html` e compile a base de novo. O `gerar_dashboard.py` comprime a página e a coloca no firmware automaticamente.
 
 ## Rádio: alcance x taxa
 
@@ -169,9 +211,9 @@ O foguete imprime o tempo no ar real ao ligar e avisa se o período estiver curt
 
 Verifique a faixa do seu módulo SX1276 SMD: o firmware vem em 915 MHz (faixa usual no Brasil). Se o módulo for de 433 MHz, mude `LORA_FREQ_MHZ` para 433.0.
 
-## Formato da saída da base
+## Cópia da base pela USB
 
-Linhas `TLM,...` são dados (uma por pacote). Linhas `#` são para leitura humana: um resumo por segundo, orientação e calibração do BNO055, e alertas (sensor com falha, flash parada, bateria abaixo de 3,5 V, perda de sinal com a última posição GPS).
+Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma por pacote). Linhas `#` são para leitura humana: um resumo por segundo, orientação e calibração do BNO055, e alertas (sensor com falha, flash parada, bateria abaixo de 3,5 V, perda de sinal com a última posição GPS). Para gravar essa cópia no PC: `python ferramentas/registrar_serial.py COM5`.
 
 ```
 # [SUBIDA] alt 523.4 m (max 523.4) v +85.2 m/s | GPS fix 8 sats -23.5505123,-46.6333456 | bat 3.92 V | RSSI -87 dBm SNR 9.2 dB | perda 1.0%
@@ -180,14 +222,15 @@ Linhas `TLM,...` são dados (uma por pacote). Linhas `#` são para leitura human
 
 ## Antes de voar
 
-1. Com `info` no monitor serial do foguete, confirme que BMP280, BNO055, GPS e flash aparecem como ok.
-2. Apague a flash (`apagar confirmo`) e confira que a base não mostra o alerta "NAO esta gravando na flash".
-3. Teste de bancada com os dois lados ligados: a perda deve ficar perto de 0%.
-4. Teste de alcance no solo com o foguete montado e a antena na posição de voo. O SX1276 em SF7/125 kHz recebe até cerca de −123 dBm; procure ter uns 20 dB de margem na distância esperada.
-5. Levante o foguete 1 a 2 m e veja a altitude responder na base.
-6. Deixe o foguete ligado pelo tempo de espera previsto na rampa, para testar a bateria e o módulo de alimentação.
-7. Ajuste os limiares de `estado_voo.cpp` para o seu motor.
-8. Grave o foguete com `-DDEBUG_SERIAL=0` no `platformio.ini` para o voo.
+1. Com `info` no monitor serial do foguete, confirme que BMP280, BNO055, GPS e flash aparecem como ok. Para a W25Q128FV, o JEDEC deve ser `0xEF4018` e, depois de ligar, SR1 e SR2 devem mostrar `0x00` (sem proteção).
+2. Apague a flash (`apagar confirmo`) e confira que o dashboard não mostra o alerta "O foguete não está gravando na flash".
+3. Teste de bancada com os dois lados ligados: no dashboard, a perda deve ficar perto de 0%.
+4. Faça uma gravação de teste na base, baixe o CSV e apague, para conferir o fluxo antes do dia.
+5. Teste de alcance no solo com o foguete montado e a antena na posição de voo. O dashboard mostra a "folga até o limite" do receptor; procure ter uns 20 dB na distância esperada.
+6. Levante o foguete 1 a 2 m e veja a altitude responder na base.
+7. Deixe o foguete ligado pelo tempo de espera previsto na rampa, para testar a bateria e o módulo de alimentação.
+8. Ajuste os limiares de `estado_voo.cpp` para o seu motor.
+9. Grave o foguete com `-DDEBUG_SERIAL=0` no `platformio.ini` para o voo.
 
 ## Cuidados
 

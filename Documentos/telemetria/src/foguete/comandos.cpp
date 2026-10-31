@@ -21,6 +21,9 @@ static void info() {
     Serial.printf("# flash: NAO ENCONTRADA (JEDEC 0x%06lX)\n", (unsigned long)flashJedecId());
     return;
   }
+  uint8_t sr[3];
+  flashLerStatus(sr);
+  Serial.printf("# flash: status SR1=0x%02X SR2=0x%02X SR3=0x%02X\n", sr[0], sr[1], sr[2]);
   const uint32_t usados = registroUsados(), cap = registroCapacidade();
   Serial.printf("# flash: JEDEC 0x%06lX, %lu de %lu registros (%.1f%%), sessao %u, %s\n",
                 (unsigned long)flashJedecId(), (unsigned long)usados, (unsigned long)cap,
