@@ -21,7 +21,8 @@ import serial  # pip install pyserial
 # Mantenha igual a TLM_COLUNAS (lib/Telemetria/Protocolo.cpp) + 3 colunas da base
 COLUNAS = [
     "seq", "tempo_ms", "estado", "status", "alt_m", "alt_max_m", "vel_ms", "temp_c",
-    "ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps", "qw", "qx", "qy", "qz",
+    "ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps", "mx_ut", "my_ut", "mz_ut",
+    "qw", "qx", "qy", "qz",
     "cal_sis", "cal_giro", "cal_acel", "cal_mag", "lat", "lon", "alt_gps_m", "sats",
     "bat_v", "rssi_dbm", "snr_db", "perdidos",
 ]

@@ -50,6 +50,7 @@ static void montarPacote(PacoteTelemetria& p, uint16_t seq) {
   for (int i = 0; i < 3; i++) {
     p.acelMg[i]    = saturar16(leitura.acelG[i] * 1000.0f);
     p.giroDps10[i] = saturar16(leitura.giroDps[i] * 10.0f);
+    p.magUT10[i]   = saturar16(leitura.magUT[i] * 10.0f);
   }
   for (int i = 0; i < 4; i++) {
     p.quat[i] = saturar16(leitura.quat[i] * QUAT_ESCALA);

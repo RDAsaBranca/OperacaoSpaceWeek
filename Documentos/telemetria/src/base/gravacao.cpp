@@ -3,18 +3,21 @@
 #include <sys/time.h>
 #include <time.h>
 
-static const char*    ARQUIVO        = "/voo_base.bin";
+// O nome leva a versao do pacote: registros de outra versao tem outro tamanho
+// e nao podem ser lidos com esta struct (o arquivo antigo fica intacto).
+static const char*    ARQUIVO        = "/voo_base_v3.bin";
 static const uint32_t MARGEM_LIVRE   = 16 * 1024;  // para antes de encher de vez
 static const uint32_t PERIODO_SYNC_MS = 1000;      // grava no flash 1x por segundo
 
 struct __attribute__((packed)) RegistroBase {
-  PacoteTelemetria pacote;   // 58 bytes
+  PacoteTelemetria pacote;   // 64 bytes
   int64_t  epochMs;          // hora UTC da recepcao (0 se a base nao sabia a hora)
   uint32_t tBaseMs;          // millis() da base
   int16_t  rssiDeci;         // dBm x 10
   int16_t  snrCenti;         // dB x 100
 };
-static_assert(sizeof(RegistroBase) == 74, "RegistroBase mudou de tamanho");
+static_assert(TLM_VERSAO == 3, "pacote mudou de versao: troque o nome em ARQUIVO");
+static_assert(sizeof(RegistroBase) == 80, "RegistroBase mudou de tamanho");
 
 static bool     sistemaOk = false;
 static File     arquivo;

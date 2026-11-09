@@ -141,6 +141,12 @@ void sensoresLer(LeituraSensores& l) {
     l.giroDps[0] = g.x();
     l.giroDps[1] = g.y();
     l.giroDps[2] = g.z();
+    // Magnetometro: existe nos dois modos (NDOF e AMG). Em NDOF o BNO055 ja
+    // aplica os offsets da calibracao que ele mesmo levantou.
+    imu::Vector<3> m = bno->getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);   // uT
+    l.magUT[0] = m.x();
+    l.magUT[1] = m.y();
+    l.magUT[2] = m.z();
     // Aceleracao exatamente zero nos 3 eixos indica leitura falha no I2C
     if (a.x() != 0 || a.y() != 0 || a.z() != 0) l.status |= STATUS_IMU_OK;
 
@@ -215,8 +221,10 @@ void sensoresImprimirDiagnostico(const LeituraSensores& l, Print& s) {
   } else if (!(l.status & STATUS_IMU_OK)) {
     s.println("[BNO055] FALHA: leitura zerada, I2C com problema?");
   } else {
-    s.printf("[BNO055] ok    | acel %+.2f %+.2f %+.2f g | giro %+.1f %+.1f %+.1f graus/s",
-             l.acelG[0], l.acelG[1], l.acelG[2], l.giroDps[0], l.giroDps[1], l.giroDps[2]);
+    s.printf("[BNO055] ok    | acel %+.2f %+.2f %+.2f g | giro %+.1f %+.1f %+.1f graus/s"
+             " | mag %+.1f %+.1f %+.1f uT",
+             l.acelG[0], l.acelG[1], l.acelG[2], l.giroDps[0], l.giroDps[1], l.giroDps[2],
+             l.magUT[0], l.magUT[1], l.magUT[2]);
 #if !IMU_MODO_ALTO_G
     const unsigned c = l.calibracao;
     if (l.status & STATUS_ORIENT_OK) {

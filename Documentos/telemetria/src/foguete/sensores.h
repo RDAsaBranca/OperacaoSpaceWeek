@@ -14,6 +14,7 @@ struct LeituraSensores {
   float    temperaturaC = 0;
   float    acelG[3] = {0, 0, 0};
   float    giroDps[3] = {0, 0, 0};
+  float    magUT[3] = {0, 0, 0};     // campo magnetico [uT]
   float    quat[4] = {1, 0, 0, 0};   // w, x, y, z
   uint8_t  calibracao = 0;           // sistema<<6 | giro<<4 | acel<<2 | mag
   double   latitude = 0;             // ultima posicao conhecida (mantida sem fix)

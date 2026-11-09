@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Teste do enlace</title>
+<style>
+:root {
+  --papel: #EEF1F4;
+  --superficie: #FFFFFF;
+  --superficie-2: #E2E7EC;
+  --tinta: #13202C;
+  --tinta-2: #4F5D6B;
+  --linha: #CBD3DB;
+  --ceu: #2457A6;
+  --ocre: #9A6400;
+  --verde: #2C7A4B;
+  --vermelho: #BF3328;
+  --rampa: #66727F;
+  --instr: "Bahnschrift", "DIN Alternate", "DIN 2014", "Roboto Condensed", sans-serif-condensed, "Arial Narrow", system-ui, sans-serif;
+  --corpo: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #0E151D;
+    --superficie: #16202A;
+    --superficie-2: #1F2B37;
+    --tinta: #E6ECF2;
+    --tinta-2: #9BA9B7;
+    --linha: #2B3947;
+    --ceu: #79A7EE;
+    --ocre: #E2A541;
+    --verde: #62C08A;
+    --vermelho: #F0675C;
+    --rampa: #8C99A6;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font: 15px/1.45 var(--corpo);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+button { font: inherit; }
+:focus-visible { outline: 3px solid var(--ceu); outline-offset: 2px; }
+
+/* ---------- barra superior ---------- */
+.topo {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+  background: var(--papel);
+  border-bottom: 1px solid var(--linha);
+}
+.marca { font: 600 18px/1.2 var(--instr); margin-right: auto; }
+.etiqueta {
+  font: 600 13px/1 var(--instr); padding: 5px 8px; border-radius: 4px;
+  background: var(--ocre); color: var(--superficie);
+}
+.enlace { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.enlace::before {
+  content: ""; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--rampa);
+}
+.enlace[data-estado="ok"]::before { background: var(--verde); }
+.enlace[data-estado="alerta"]::before { background: var(--vermelho); }
+.rec { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--vermelho); }
+.rec::before {
+  content: ""; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--vermelho); animation: pulso 1.4s ease-in-out infinite;
+}
+@keyframes pulso { 50% { opacity: .25; } }
+
+/* ---------- alertas ---------- */
+.alertas { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+.alertas:empty { display: none; }
+.alertas p {
+  margin: 12px 0 0; padding: 10px 12px;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-left: 5px solid var(--vermelho); border-radius: 4px;
+}
+.alertas p.aviso { border-left-color: var(--ocre); }
+
+/* ---------- layout ---------- */
+main {
+  display: flex; flex-direction: column; gap: 14px;
+  max-width: 1280px; margin: 0 auto; padding: 14px 16px 24px;
+}
+.coluna { display: contents; }
+.painel {
+  background: var(--superficie);
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+h2 { font: 600 16px/1.2 var(--instr); margin: 0 0 12px; }
+#voo { order: 1; } #sinal { order: 2; } #receptores { order: 3; } #graficos { order: 4; }
+#posicao { order: 5; } #atitude { order: 6; } #sistemas-painel { order: 7; } #gravacao { order: 8; }
+
+/* ---------- receptores (SX1276 x RYLR998) ---------- */
+.tabela-rx { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tabela-rx th, .tabela-rx td { padding: 7px 0; border-top: 1px solid var(--linha); text-align: right; }
+.tabela-rx thead th { border-top: 0; padding-top: 0; font: 600 15px/1.2 var(--instr); }
+.tabela-rx tbody th { text-align: left; font-weight: 400; color: var(--tinta-2); }
+.tabela-rx td { font: 600 17px/1.2 var(--instr); }
+.tabela-rx td[data-estado="ok"] { color: var(--verde); }
+.tabela-rx td[data-estado="alerta"] { color: var(--vermelho); }
+.mag { margin: 14px 0 0; grid-template-columns: repeat(4, 1fr); }
+.mag dd { font-size: 20px; }
+
+@media (min-width: 960px) {
+  main { display: grid; grid-template-columns: minmax(360px, 420px) 1fr; align-items: start; }
+  .coluna { display: flex; flex-direction: column; gap: 14px; }
+}
+
+/* ---------- voo: fases + altimetro ---------- */
+.voo { --cor-fase: var(--rampa); }
+.voo[data-fase="1"] { --cor-fase: var(--ceu); }
+.voo[data-fase="2"] { --cor-fase: var(--ocre); }
+.voo[data-fase="3"] { --cor-fase: var(--verde); }
+.fases {
+  list-style: none; margin: 0 0 16px; padding: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+}
+.fases li {
+  font: 600 14px/1.2 var(--instr); color: var(--tinta-2);
+  padding-top: 8px; border-top: 5px solid var(--superficie-2);
+}
+.fases li.feita { border-top-color: var(--tinta-2); }
+.fases li.atual { border-top-color: var(--cor-fase); color: var(--tinta); }
+.instrumento { display: grid; grid-template-columns: 84px 1fr; gap: 14px; }
+.instrumento > div { container-type: inline-size; min-width: 0; }
+#fita { width: 84px; height: 248px; display: block; }
+.altitude {
+  margin: 0; font: 600 52px/1 var(--instr); font-size: clamp(40px, 21cqi, 68px);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  color: var(--cor-fase);
+}
+.altitude .un { font-size: .38em; margin-left: .2em; color: var(--tinta-2); }
+.legenda { margin: 6px 0 16px; color: var(--tinta-2); }
+.numeros { margin: 0; display: grid; gap: 10px; }
+.numeros div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-top: 1px solid var(--linha); padding-top: 8px; }
+.numeros dt { color: var(--tinta-2); }
+.numeros dd { margin: 0; font: 600 20px/1.1 var(--instr); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vazio { margin: 14px 0 0; color: var(--tinta-2); }
+
+/* ---------- listas de valores ---------- */
+.grade { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.grade dt { color: var(--tinta-2); font-size: 14px; }
+.grade dd { margin: 2px 0 0; font: 600 20px/1.15 var(--instr); font-variant-numeric: tabular-nums; }
+.grade .largo { grid-column: 1 / -1; }
+
+/* ---------- sistemas ---------- */
+.sistemas { list-style: none; margin: 0; padding: 0; }
+.sistemas li {
+  display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px;
+  padding: 9px 0; border-top: 1px solid var(--linha);
+}
+.sistemas li:first-child { border-top: 0; padding-top: 0; }
+.sistemas .ponto { width: 10px; height: 10px; border-radius: 50%; background: var(--rampa); }
+.sistemas [data-estado="ok"] .ponto { background: var(--verde); }
+.sistemas [data-estado="aviso"] .ponto { background: var(--ocre); }
+.sistemas [data-estado="alerta"] .ponto { background: var(--vermelho); }
+.sistemas .detalhe { color: var(--tinta-2); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- graficos ---------- */
+.cabecalho { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.segmentos { display: inline-flex; border: 1px solid var(--linha); border-radius: 6px; overflow: hidden; }
+.segmentos button {
+  border: 0; background: transparent; color: var(--tinta-2);
+  padding: 8px 12px; min-height: 40px; cursor: pointer; font-weight: 600;
+}
+.segmentos button + button { border-left: 1px solid var(--linha); }
+.segmentos button[aria-pressed="true"], .segmentos button[aria-selected="true"] {
+  background: var(--tinta); color: var(--superficie);
+}
+@media (max-width: 639px) {
+  .cabecalho .segmentos { display: flex; width: 100%; }
+  .cabecalho .segmentos button { flex: 1; padding: 8px 4px; font-size: 14px; }
+}
+#grafico { width: 100%; height: 240px; display: block; }
+@media (min-width: 960px) { #grafico { height: 300px; } }
+
+/* ---------- posicao ---------- */
+.gps-grade { display: grid; gap: 14px; }
+#trajeto { width: 100%; height: 220px; display: block; background: var(--superficie-2); border-radius: 6px; }
+@media (min-width: 640px) { .gps-grade { grid-template-columns: 1fr 1fr; } #trajeto { height: 100%; min-height: 240px; } }
+.coordenadas { font: 600 18px/1.3 var(--instr); font-variant-numeric: tabular-nums; user-select: all; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.links a { color: var(--ceu); font-weight: 600; }
+
+/* ---------- atitude ---------- */
+.angulos { margin: 0 0 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.angulos dt { color: var(--tinta-2); font-size: 14px; }
+.angulos dd { margin: 2px 0 0; font: 600 26px/1.1 var(--instr); font-variant-numeric: tabular-nums; }
+.calibracao { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.calibracao li { font-size: 14px; color: var(--tinta-2); }
+@media (max-width: 639px) { .calibracao { grid-template-columns: repeat(2, 1fr); } }
+.barras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 4px; }
+.barras i { height: 8px; border-radius: 2px; background: var(--superficie-2); }
+.barras i.cheia { background: var(--verde); }
+
+/* ---------- gravacao ---------- */
+.botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.botao {
+  min-height: 44px; padding: 10px 14px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: 6px;
+  background: var(--superficie); color: var(--tinta); font-weight: 600;
+}
+.botao:disabled { opacity: .45; cursor: not-allowed; }
+.botao.gravar { background: var(--vermelho); border-color: var(--vermelho); color: #fff; }
+.botao.perigo { color: var(--vermelho); }
+.msg { min-height: 1.45em; margin: 8px 0 0; color: var(--vermelho); font-weight: 600; }
+.nota { margin: 6px 0 0; color: var(--tinta-2); font-size: 14px; }
+.separador { border: 0; border-top: 1px solid var(--linha); margin: 14px 0; }
+#grav-status { margin: 0 0 12px; }
+
+@media (prefers-reduced-motion: reduce) { .rec::before { animation: none; } }
+</style>
+</head>
+<body>
+<header class="topo">
+  <strong class="marca">Estação base · teste SX1276 + RYLR998</strong>
+  <span id="simulacao" class="etiqueta" hidden>Simulação</span>
+  <span id="enlace" class="enlace" data-estado="neutro">Conectando à base…</span>
+  <span id="rec" class="rec" hidden>Gravando <span id="rec-tempo">00:00</span></span>
+</header>
+<div id="alertas" class="alertas" aria-live="polite"></div>
+
+<main>
+  <div class="coluna">
+    <section id="voo" class="painel voo" data-fase="0" aria-label="Voo">
+      <ol class="fases">
+        <li>Rampa</li><li>Subida</li><li>Descida</li><li>Pousado</li>
+      </ol>
+      <div class="instrumento">
+        <canvas id="fita" aria-hidden="true"></canvas>
+        <div>
+          <p class="altitude"><span id="alt">—</span><span class="un">m</span></p>
+          <p class="legenda">acima da rampa</p>
+          <dl class="numeros">
+            <div><dt>Máxima</dt><dd id="altmax">—</dd></div>
+            <div><dt>Vertical</dt><dd id="vel">—</dd></div>
+            <div><dt>Desde o lançamento</dt><dd id="tmais">—</dd></div>
+          </dl>
+        </div>
+      </div>
+      <p id="vazio" class="vazio">Aguardando o primeiro pacote do foguete. <span id="escuta"></span></p>
+    </section>
+
+    <section id="sinal" class="painel" aria-labelledby="h-sinal">
+      <h2 id="h-sinal">Sinal do rádio (melhor receptor)</h2>
+      <dl class="grade">
+        <div><dt>Intensidade (RSSI)</dt><dd id="rssi">—</dd></div>
+        <div><dt>Relação sinal-ruído</dt><dd id="snr">—</dd></div>
+        <div><dt>Folga até o limite</dt><dd id="margem">—</dd></div>
+        <div><dt>Pacotes perdidos</dt><dd id="perda">—</dd></div>
+        <div><dt>Pacotes recebidos</dt><dd id="recebidos">—</dd></div>
+        <div><dt>Último pacote</dt><dd id="ultimo-pacote">—</dd></div>
+      </dl>
+    </section>
+
+    <section id="receptores" class="painel" aria-labelledby="h-rx">
+      <h2 id="h-rx">Receptores da base</h2>
+      <table class="tabela-rx">
+        <thead><tr><th scope="col"><span hidden>Grandeza</span></th><th scope="col">SX1276</th><th scope="col">RYLR998</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Estado</th><td id="rx-sx-estado">—</td><td id="rx-ry-estado">—</td></tr>
+          <tr><th scope="row">RSSI</th><td id="rx-sx-rssi">—</td><td id="rx-ry-rssi">—</td></tr>
+          <tr><th scope="row">SNR</th><td id="rx-sx-snr">—</td><td id="rx-ry-snr">—</td></tr>
+          <tr><th scope="row">Pacotes recebidos</th><td id="rx-sx-entregues">—</td><td id="rx-ry-entregues">—</td></tr>
+          <tr><th scope="row">Perda</th><td id="rx-sx-perda">—</td><td id="rx-ry-perda">—</td></tr>
+          <tr><th scope="row">Só este recebeu</th><td id="rx-sx-exclusivos">—</td><td id="rx-ry-exclusivos">—</td></tr>
+          <tr><th scope="row">Chegaram atrasados</th><td id="rx-sx-atrasados">—</td><td id="rx-ry-atrasados">—</td></tr>
+          <tr><th scope="row">Inválidos</th><td id="rx-sx-invalidos">—</td><td id="rx-ry-invalidos">—</td></tr>
+        </tbody>
+      </table>
+      <p id="rx-nota" class="nota">—</p>
+    </section>
+
+    <section id="sistemas-painel" class="painel" aria-labelledby="h-sis">
+      <h2 id="h-sis">Sistemas do foguete</h2>
+      <ul id="sistemas" class="sistemas"></ul>
+    </section>
+
+    <section id="gravacao" class="painel" aria-labelledby="h-grav">
+      <h2 id="h-grav">Gravação na estação base</h2>
+      <p id="grav-status">—</p>
+      <div class="botoes">
+        <button id="grav-iniciar" class="botao gravar" type="button">Iniciar gravação</button>
+        <button id="grav-parar" class="botao" type="button" hidden>Parar gravação</button>
+        <button id="grav-baixar" class="botao" type="button">Baixar CSV</button>
+        <button id="grav-apagar" class="botao perigo" type="button">Apagar gravação</button>
+      </div>
+      <p id="grav-msg" class="msg" role="status"></p>
+      <p class="nota">A gravação fica na memória da base e continua mesmo se este aparelho desconectar. Para baixar ou apagar, pare a gravação.</p>
+      <hr class="separador">
+      <button id="baixar-tela" class="botao" type="button">Baixar dados desta tela</button>
+      <p class="nota">Salva neste aparelho os <span id="n-tela">0</span> pacotes recebidos desde que a página foi aberta.</p>
+    </section>
+  </div>
+
+  <div class="coluna">
+    <section id="graficos" class="painel" aria-label="Gráficos">
+      <div class="cabecalho">
+        <div class="segmentos" role="tablist" aria-label="Grandeza">
+          <button type="button" role="tab" data-aba="alt" aria-selected="true">Altitude</button>
+          <button type="button" role="tab" data-aba="vel" aria-selected="false">Velocidade</button>
+          <button type="button" role="tab" data-aba="acel" aria-selected="false">Aceleração</button>
+          <button type="button" role="tab" data-aba="rssi" aria-selected="false">Sinal</button>
+        </div>
+        <div class="segmentos" aria-label="Período">
+          <button type="button" data-janela="120" aria-pressed="true">Últimos 2 min</button>
+          <button type="button" data-janela="0" aria-pressed="false">Tudo</button>
+        </div>
+      </div>
+      <canvas id="grafico" role="img" aria-label="Gráfico da grandeza selecionada"></canvas>
+    </section>
+
+    <section id="posicao" class="painel" aria-labelledby="h-pos">
+      <h2 id="h-pos">Posição</h2>
+      <div class="gps-grade">
+        <canvas id="trajeto" role="img" aria-label="Trajetória vista de cima"></canvas>
+        <dl class="grade">
+          <div class="largo"><dt>Última posição</dt><dd id="coords" class="coordenadas">—</dd></div>
+          <div><dt>Distância da rampa</dt><dd id="distancia">—</dd></div>
+          <div><dt>Direção</dt><dd id="direcao">—</dd></div>
+          <div><dt>Satélites</dt><dd id="sats">—</dd></div>
+          <div><dt>Altitude GPS</dt><dd id="altgps">—</dd></div>
+          <div class="largo links" id="links" hidden>
+            <a id="link-geo" href="#">Abrir no app de mapas</a>
+            <a id="link-gmaps" href="#" target="_blank" rel="noopener">Abrir no Google Maps</a>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="atitude" class="painel" aria-labelledby="h-ati">
+      <h2 id="h-ati">Atitude (BNO055)</h2>
+      <dl class="angulos">
+        <div><dt>Rolagem</dt><dd id="rol">—</dd></div>
+        <div><dt>Arfagem</dt><dd id="arf">—</dd></div>
+        <div><dt>Guinada</dt><dd id="gui">—</dd></div>
+      </dl>
+      <ul class="calibracao" aria-label="Calibração de 0 a 3">
+        <li>Sistema<div class="barras" id="cal-sis"><i></i><i></i><i></i></div></li>
+        <li>Giroscópio<div class="barras" id="cal-giro"><i></i><i></i><i></i></div></li>
+        <li>Acelerômetro<div class="barras" id="cal-acel"><i></i><i></i><i></i></div></li>
+        <li>Magnetômetro<div class="barras" id="cal-mag"><i></i><i></i><i></i></div></li>
+      </ul>
+      <p id="atitude-nota" class="nota" hidden>Sem orientação: o BNO055 está no modo de alto g ou ainda não iniciou a fusão.</p>
+      <dl class="angulos mag" aria-label="Campo magnético">
+        <div><dt>Mag X</dt><dd id="mx">—</dd></div>
+        <div><dt>Mag Y</dt><dd id="my">—</dd></div>
+        <div><dt>Mag Z</dt><dd id="mz">—</dd></div>
+        <div><dt>|B|</dt><dd id="mb">—</dd></div>
+      </dl>
+    </section>
+  </div>
+</main>
+
+<noscript><p class="alertas">Esta página precisa de JavaScript ativado.</p></noscript>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const FASES = ['RAMPA', 'SUBIDA', 'DESCIDA', 'POUSADO'];
+const VAR_FASE = ['--rampa', '--ceu', '--ocre', '--verde'];
+const ST = { BARO: 1, IMU: 2, GPS: 4, FIX: 8, ORIENT: 16 };
+const SENSIBILIDADE = { 7: -123, 8: -126, 9: -129, 10: -132, 11: -134.5, 12: -137 }; // SX1276, BW 125 kHz
+const MAX_PONTOS = 36000;
+const BATERIA_BAIXA = 3.5;
+
+let info = null, colunas = null;
+let ultimoIndice = 0;
+let conectado = null;
+let status = null, tStatus = 0;
+let atual = null;
+const serie = { t: [], alt: [], vel: [], ax: [], ay: [], az: [], rssiSx: [], rssiRy: [] };
+// Ultimo valor valido de cada receptor (um pacote pode chegar so por um deles)
+const ultimoRx = { sx: null, ry: null };
+let deslocT = 0, ultimoTBruto = null, tLancamento = null;
+let origem = null;
+const trajeto = [];
+const linhasTela = [];
+let aba = 'alt', janela = 120, desenhoPendente = false;
+
+// ---------- utilidades ----------
+const formatos = new Map();
+function fmt(v, casas = 1) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  let f = formatos.get(casas);
+  if (!f) {
+    f = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+    formatos.set(casas, f);
+  }
+  if (Math.abs(v) < 0.5 * Math.pow(10, -casas)) v = 0;
+  return f.format(v).replace('-', '\u2212');
+}
+function comSinal(v, casas) { return (v > 0 ? '+' : '') + fmt(v, casas); }
+function mmss(seg) {
+  const s = Math.max(0, Math.round(seg));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function cor(nome) { return getComputedStyle(document.documentElement).getPropertyValue(nome).trim(); }
+function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function texto(sel, valor) { const el = $(sel); if (el.textContent !== valor) el.textContent = valor; }
+
+async function buscarJson(url, opcoes = {}) {
+  const ctrl = new AbortController();
+  const limite = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(url, { ...opcoes, cache: 'no-store', signal: ctrl.signal });
+    if (!r.ok) throw new Error((await r.text()) || ('Erro ' + r.status));
+    return await r.json();
+  } finally {
+    clearTimeout(limite);
+  }
+}
+
+// ---------- recepcao dos dados ----------
+function interpretar(linha) {
+  const c = linha.split(',');
+  if (c.length !== colunas.length) return null;
+  const p = {};
+  for (let i = 0; i < colunas.length; i++) p[colunas[i]] = colunas[i] === 'estado' ? c[i] : Number(c[i]);
+  return p;
+}
+
+function receber(linha, horaIso) {
+  const p = interpretar(linha);
+  if (!p) return;
+  linhasTela.push(horaIso + ',' + linha);
+
+  // tempo do foguete em segundos, continuo mesmo se ele reiniciar
+  let t = p.tempo_ms / 1000;
+  if (ultimoTBruto !== null && t < ultimoTBruto - 5) deslocT += ultimoTBruto;
+  ultimoTBruto = t;
+  t += deslocT;
+  p.t = t;
+  p.fase = Math.max(0, FASES.indexOf(p.estado));
+  if (p.fase >= 1 && tLancamento === null) tLancamento = t;
+
+  serie.t.push(t); serie.alt.push(p.alt_m); serie.vel.push(p.vel_ms);
+  serie.ax.push(p.ax_g); serie.ay.push(p.ay_g); serie.az.push(p.az_g);
+  serie.rssiSx.push(p.rssi_sx_dbm); serie.rssiRy.push(p.rssi_ry_dbm);  // NaN = nao recebeu
+  if (Number.isFinite(p.rssi_sx_dbm)) ultimoRx.sx = { rssi: p.rssi_sx_dbm, snr: p.snr_sx_db };
+  if (Number.isFinite(p.rssi_ry_dbm)) ultimoRx.ry = { rssi: p.rssi_ry_dbm, snr: p.snr_ry_db };
+  if (serie.t.length > MAX_PONTOS) {
+    const n = Math.floor(MAX_PONTOS / 10);
+    for (const k in serie) serie[k].splice(0, n);
+  }
+
+  if ((p.status & ST.FIX) && (p.lat || p.lon)) {
+    if (!origem) origem = { lat: p.lat, lon: p.lon };
+    const e = (p.lon - origem.lon) * 111320 * Math.cos(origem.lat * Math.PI / 180);
+    const n = (p.lat - origem.lat) * 111320;
+    trajeto.push({ e, n });
+    if (trajeto.length > MAX_PONTOS) trajeto.splice(0, Math.floor(MAX_PONTOS / 10));
+  }
+  atual = p;
+}
+
+async function ciclo() {
+  let proximo = 250;
+  try {
+    const d = await buscarJson('/api/dados?desde=' + ultimoIndice);
+    mostrarConexao(true);
+    if (d.ultimo < ultimoIndice) {
+      ultimoIndice = 0;  // a base reiniciou: recomeca pelo historico dela
+      proximo = 0;
+    } else {
+      const hora = new Date().toISOString();
+      for (const l of d.linhas) receber(l, hora);
+      ultimoIndice = d.ultimo;
+      if (d.mais) proximo = 0;
+    }
+    status = d;
+    tStatus = performance.now();
+    atualizarTudo();
+  } catch (e) {
+    mostrarConexao(false);
+    proximo = 1000;
+  }
+  setTimeout(ciclo, proximo);
+}
+
+function semSinalMs() {
+  if (!status || status.sem_sinal_ms < 0) return -1;
+  return status.sem_sinal_ms + (performance.now() - tStatus);
+}
+
+// ---------- atualizacao da tela ----------
+function mostrarConexao(ok) {
+  if (conectado !== ok) {
+    conectado = ok;
+    atualizarEnlace();
+    atualizarAlertas();
+  }
+}
+
+function atualizarEnlace() {
+  const el = $('#enlace');
+  let txt, est;
+  if (!conectado) { txt = 'Sem conexão com a base'; est = 'alerta'; }
+  else if (!status) { txt = 'Conectado à base'; est = 'neutro'; }
+  else if (!status.radio_ok && !status.reyax_ok) { txt = 'Nenhum rádio da base respondeu'; est = 'alerta'; }
+  else if (semSinalMs() < 0) { txt = 'Aguardando o foguete'; est = 'neutro'; }
+  else if (semSinalMs() > info.timeout_ms) { txt = 'Sem sinal há ' + Math.floor(semSinalMs() / 1000) + ' s'; est = 'alerta'; }
+  else { txt = 'Recebendo do foguete'; est = 'ok'; }
+  texto('#enlace', txt);
+  el.dataset.estado = est;
+}
+
+function atualizarVoo() {
+  const sec = $('#voo');
+  $('#vazio').hidden = !!atual;
+  if (!atual) return;
+  sec.dataset.fase = String(atual.fase);
+  document.querySelectorAll('.fases li').forEach((li, i) => {
+    li.classList.toggle('feita', i < atual.fase);
+    li.classList.toggle('atual', i === atual.fase);
+    if (i === atual.fase) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
+  texto('#alt', fmt(atual.alt_m, 1));
+  texto('#altmax', fmt(atual.alt_max_m, 1) + ' m');
+  texto('#vel', comSinal(atual.vel_ms, 1) + ' m/s');
+  texto('#tmais', tLancamento === null ? '—' : 'T+ ' + mmss(atual.t - tLancamento));
+}
+
+function atualizarSinal() {
+  if (!status) return;
+  const total = status.recebidos + status.perdidos;
+  texto('#perda', total ? fmt(100 * status.perdidos / total, 1) + ' %' : '—');
+  texto('#recebidos', fmt(status.recebidos, 0));
+  const s = semSinalMs();
+  texto('#ultimo-pacote', s < 0 ? '—' : (s < 1000 ? 'agora' : 'há ' + fmt(s / 1000, 0) + ' s'));
+  if (!atual) return;
+  texto('#rssi', fmt(atual.rssi_dbm, 0) + ' dBm');
+  texto('#snr', fmt(atual.snr_db, 1) + ' dB');
+  const lim = SENSIBILIDADE[info.sf];
+  texto('#margem', lim ? fmt(atual.rssi_dbm - lim, 0) + ' dB' : '—');
+}
+
+// Tabela SX1276 x RYLR998: o que cada receptor entregou do mesmo enlace
+function atualizarReceptores() {
+  if (!status) return;
+  const esperados = status.recebidos + status.perdidos;
+  const linhas = [
+    ['sx', status.radio_ok, status.rx.sx, status.invalidos],
+    ['ry', status.reyax_ok, status.rx.ry, status.invalidos_ry],
+  ];
+  for (const [k, ok, r, invalidos] of linhas) {
+    let est, txt;
+    if (!ok) { est = 'alerta'; txt = 'sem resposta'; }
+    else if (status.recebidos >= 10 && r.entregues === 0) { est = 'alerta'; txt = 'não recebe'; }
+    else { est = 'ok'; txt = 'ok'; }
+    const cel = $('#rx-' + k + '-estado');
+    texto('#rx-' + k + '-estado', txt);
+    cel.dataset.estado = est;
+    const u = ultimoRx[k];
+    texto('#rx-' + k + '-rssi', u ? fmt(u.rssi, 0) + ' dBm' : '—');
+    texto('#rx-' + k + '-snr', u ? fmt(u.snr, 1) + ' dB' : '—');
+    texto('#rx-' + k + '-entregues', fmt(r.entregues, 0));
+    const aTempo = Math.min(esperados, r.entregues - r.atrasados);
+    texto('#rx-' + k + '-perda', esperados ? fmt(100 * (esperados - aTempo) / esperados, 1) + ' %' : '—');
+    texto('#rx-' + k + '-exclusivos', fmt(r.exclusivos, 0));
+    texto('#rx-' + k + '-atrasados', fmt(r.atrasados, 0));
+    texto('#rx-' + k + '-invalidos', fmt(invalidos, 0));
+  }
+  const ry = status.rx.ry;
+  texto('#rx-nota',
+    'RYLR998: ' + (ry.versao || 'versão desconhecida') + ' · ' + fmt(ry.linhas_rcv, 0) + ' linhas +RCV, ' +
+    fmt(ry.linhas_ruins, 0) + ' mal formadas, ' + fmt(ry.erros_modulo, 0) + ' +ERR' +
+    (ry.ultimo_erro ? ' (último ' + ry.ultimo_erro + ')' : '') +
+    '. SX1276: ' + fmt(status.erros_crc, 0) + ' erros de CRC, ' + fmt(status.erros_radio, 0) + ' outros erros.' +
+    ' Janela de fusão: ' + info.janela_fusao_ms + ' ms.');
+}
+
+function itemSistema(nome, estado, detalhe) {
+  return '<li data-estado="' + estado + '"><span class="ponto"></span><span>' + nome +
+         '</span><span class="detalhe">' + detalhe + '</span></li>';
+}
+
+function atualizarSistemas() {
+  if (!atual) { $('#sistemas').innerHTML = itemSistema('Sem dados do foguete ainda', 'neutro', ''); return; }
+  const s = atual.status;
+  const v = atual.bat_v;
+  const carga = Math.max(0, Math.min(100, (v - 3.3) / (4.2 - 3.3) * 100));
+  let gps;
+  if (!(s & ST.GPS)) gps = ['alerta', 'sem dados'];
+  else if (!(s & ST.FIX)) gps = ['aviso', 'sem posição, ' + atual.sats + ' satélites'];
+  else gps = ['ok', 'com posição, ' + atual.sats + ' satélites'];
+  $('#sistemas').innerHTML =
+    itemSistema('Bateria', v < BATERIA_BAIXA ? 'alerta' : 'ok', fmt(v, 2) + ' V, ~' + fmt(carga, 0) + ' %') +
+    itemSistema('Barômetro BMP280', (s & ST.BARO) ? 'ok' : 'alerta', (s & ST.BARO) ? fmt(atual.temp_c, 1) + ' °C' : 'falha') +
+    itemSistema('IMU BNO055', (s & ST.IMU) ? 'ok' : 'alerta', (s & ST.IMU) ? ((s & ST.ORIENT) ? 'com orientação' : 'sem orientação') : 'falha') +
+    itemSistema('GPS ATGM336H', gps[0], gps[1]);
+}
+
+function quatParaEuler(p) {
+  const w = p.qw, x = p.qx, y = p.qy, z = p.qz, G = 180 / Math.PI;
+  const rol = Math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y)) * G;
+  const arf = Math.asin(Math.max(-1, Math.min(1, 2 * (w * y - z * x)))) * G;
+  let gui = Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)) * G;
+  if (gui < 0) gui += 360;
+  return { rol, arf, gui };
+}
+
+function atualizarAtitude() {
+  if (!atual) return;
+  const temOrient = !!(atual.status & ST.ORIENT);
+  $('#atitude-nota').hidden = temOrient;
+  if (temOrient) {
+    const e = quatParaEuler(atual);
+    texto('#rol', comSinal(e.rol, 1) + '°');
+    texto('#arf', comSinal(e.arf, 1) + '°');
+    texto('#gui', fmt(e.gui, 1) + '°');
+  } else {
+    texto('#rol', '—'); texto('#arf', '—'); texto('#gui', '—');
+  }
+  const cal = { '#cal-sis': atual.cal_sis, '#cal-giro': atual.cal_giro, '#cal-acel': atual.cal_acel, '#cal-mag': atual.cal_mag };
+  for (const [sel, nivel] of Object.entries(cal)) {
+    $(sel).querySelectorAll('i').forEach((b, i) => b.classList.toggle('cheia', temOrient && i < nivel));
+  }
+  // Magnetometro: existe nos dois modos do BNO055 (NDOF e AMG)
+  const imu = !!(atual.status & ST.IMU);
+  texto('#mx', imu ? comSinal(atual.mx_ut, 1) : '—');
+  texto('#my', imu ? comSinal(atual.my_ut, 1) : '—');
+  texto('#mz', imu ? comSinal(atual.mz_ut, 1) : '—');
+  texto('#mb', imu ? fmt(Math.hypot(atual.mx_ut, atual.my_ut, atual.mz_ut), 1) + ' µT' : '—');
+}
+
+const DIRECOES = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+function atualizarPosicao() {
+  if (!atual) return;
+  texto('#sats', fmt(atual.sats, 0));
+  texto('#altgps', (atual.status & ST.FIX) ? fmt(atual.alt_gps_m, 0) + ' m' : '—');
+  if (!atual.lat && !atual.lon) return;
+  const lat = atual.lat.toFixed(7), lon = atual.lon.toFixed(7);
+  texto('#coords', lat + ', ' + lon + ((atual.status & ST.FIX) ? '' : ' (última conhecida)'));
+  $('#links').hidden = false;
+  $('#link-geo').href = 'geo:' + lat + ',' + lon + '?q=' + lat + ',' + lon;
+  $('#link-gmaps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+  if (trajeto.length) {
+    const u = trajeto[trajeto.length - 1];
+    const d = Math.hypot(u.e, u.n);
+    texto('#distancia', d < 1000 ? fmt(d, 0) + ' m' : fmt(d / 1000, 2) + ' km');
+    const ang = (Math.atan2(u.e, u.n) * 180 / Math.PI + 360) % 360;
+    texto('#direcao', d < 5 ? '—' : DIRECOES[Math.round(ang / 45) % 8] + ' (' + fmt(ang, 0) + '°)');
+  }
+}
+
+function tamanho(bytes) {
+  if (bytes < 1024) return fmt(bytes, 0) + ' B';
+  if (bytes < 1024 * 1024) return fmt(bytes / 1024, 0) + ' KB';
+  return fmt(bytes / 1048576, 1) + ' MB';
+}
+
+function atualizarGravacao() {
+  if (!status) return;
+  const g = status.gravacao;
+  let frase;
+  if (!g.sistema_ok) frase = 'A memória interna da base não abriu. Reinicie a base.';
+  else if (g.ativa) frase = 'Gravando há ' + mmss(g.duracao_s) + '. ' + fmt(g.registros, 0) + ' pacotes (' + tamanho(g.bytes) + ').';
+  else if (g.registros > 0) frase = 'Parada. ' + fmt(g.registros, 0) + ' pacotes guardados (' + tamanho(g.bytes) + ').';
+  else frase = 'Nada gravado ainda.';
+  if (g.sistema_ok) frase += ' Espaço livre: ' + tamanho(g.livres) + '.';
+  texto('#grav-status', frase);
+  $('#grav-iniciar').hidden = g.ativa;
+  $('#grav-parar').hidden = !g.ativa;
+  $('#grav-iniciar').disabled = !g.sistema_ok;
+  $('#grav-baixar').disabled = g.ativa || g.registros === 0;
+  $('#grav-apagar').disabled = g.ativa || g.registros === 0;
+  $('#rec').hidden = !g.ativa;
+  texto('#rec-tempo', mmss(g.duracao_s));
+  texto('#n-tela', fmt(linhasTela.length, 0));
+  $('#baixar-tela').disabled = linhasTela.length === 0;
+}
+
+function atualizarAlertas() {
+  const lista = [];
+  if (conectado === false) {
+    lista.push(['', 'Sem conexão com a estação base. Confira se este aparelho está na rede ' + (info ? info.rede : 'da base') + '.']);
+  } else if (status) {
+    const soUm = status.radio_ok !== status.reyax_ok;  // um receptor ainda funciona
+    if (!status.radio_ok) {
+      lista.push([soUm ? 'aviso' : '', 'O SX1276 da base não respondeu. Confira a fiação SPI e a alimentação.' +
+                  (soUm ? ' Só o RYLR998 está recebendo.' : '')]);
+    }
+    if (!status.reyax_ok) {
+      lista.push([soUm ? 'aviso' : '', 'O RYLR998 da base não respondeu aos comandos AT (TX e RX cruzados? 3,3 V?).' +
+                  (soUm ? ' Só o SX1276 está recebendo.' : '')]);
+    }
+    if (status.divergentes > 0) {
+      lista.push(['', fmt(status.divergentes, 0) + ' pacotes chegaram com conteúdo diferente nos dois receptores.']);
+    }
+    const s = semSinalMs();
+    if (s > info.timeout_ms && atual) {
+      lista.push(['', 'Sem sinal do foguete há ' + Math.floor(s / 1000) + ' s. Última posição: ' +
+                  atual.lat.toFixed(7) + ', ' + atual.lon.toFixed(7) + '.']);
+    }
+    if (status.gravacao.cheia) lista.push(['aviso', 'A memória da base encheu e a gravação parou. Baixe e apague a gravação.']);
+    if (atual) {
+      if (atual.bat_v < BATERIA_BAIXA) lista.push(['', 'Bateria do foguete baixa: ' + fmt(atual.bat_v, 2) + ' V.']);
+      if (!(atual.status & ST.BARO)) lista.push(['', 'Barômetro do foguete com falha.']);
+      if (!(atual.status & ST.IMU)) lista.push(['', 'IMU do foguete com falha.']);
+    }
+  }
+  const html = lista.map(([c, t]) => '<p' + (c ? ' class="' + c + '"' : '') + '>' + t + '</p>').join('');
+  const el = $('#alertas');
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+function atualizarTudo() {
+  atualizarEnlace();
+  atualizarVoo();
+  atualizarSinal();
+  atualizarReceptores();
+  atualizarSistemas();
+  atualizarAtitude();
+  atualizarPosicao();
+  atualizarGravacao();
+  atualizarAlertas();
+  agendarDesenho();
+}
+
+// ---------- desenho ----------
+function agendarDesenho() {
+  if (desenhoPendente) return;
+  desenhoPendente = true;
+  requestAnimationFrame(() => {
+    desenhoPendente = false;
+    desenharFita();
+    desenharGrafico();
+    desenharTrajeto();
+  });
+}
+
+function prepararCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+
+function passoBonito(faixa, divisoes) {
+  const bruto = faixa / divisoes;
+  const pot = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const n = bruto / pot;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pot;
+}
+
+function desenharFita() {
+  const { g, w, h } = prepararCanvas($('#fita'));
+  const alt = atual ? atual.alt_m : 0;
+  const max = atual ? atual.alt_max_m : 0;
+  const corFase = cor(VAR_FASE[atual ? atual.fase : 0]);
+  let topo = Math.max(50, max * 1.12, alt * 1.12);
+  const passo = passoBonito(topo, 5);
+  topo = Math.ceil(topo / passo) * passo;
+  const base = Math.min(0, Math.floor(alt / passo) * passo);
+  const m = 10;
+  const Y = (v) => m + (topo - v) / (topo - base) * (h - 2 * m);
+
+  g.fillStyle = cor('--superficie-2');
+  g.beginPath();
+  if (g.roundRect) g.roundRect(0, 0, w, h, 8); else g.rect(0, 0, w, h);
+  g.fill();
+
+  const xBarra = w - 26, lBarra = 10;
+  g.fillStyle = cor('--linha');
+  g.fillRect(xBarra, Y(topo), lBarra, Y(base) - Y(topo));
+  const yAlt = Y(Math.max(base, Math.min(topo, alt)));
+  g.fillStyle = corFase;
+  g.fillRect(xBarra, yAlt, lBarra, Y(base) - yAlt);
+
+  // A marca da maxima so aparece depois que o foguete desceu dela
+  const mostraMax = max > 0.5 && Y(alt) - Y(max) > 6;
+  const yMax = Y(max);
+  g.strokeStyle = cor('--tinta-2');
+  g.fillStyle = cor('--tinta-2');
+  g.lineWidth = 1;
+  g.font = '600 12px ' + cor('--instr');
+  g.textAlign = 'right';
+  g.textBaseline = 'middle';
+  for (let v = base; v <= topo + passo / 1000; v += passo) {
+    const y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(xBarra - 8, y); g.lineTo(xBarra - 2, y); g.stroke();
+    if (!(mostraMax && Math.abs(y - yMax) < 16)) g.fillText(fmt(v, 0), xBarra - 11, y);
+  }
+
+  if (mostraMax) {
+    const y = Math.round(Y(max)) + 0.5;
+    g.strokeStyle = cor('--tinta');
+    g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(4, y); g.lineTo(w - 4, y); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = cor('--tinta');
+    g.textAlign = 'left';
+    g.textBaseline = 'bottom';
+    g.fillText('máx', 6, y - 2);
+  }
+
+  g.fillStyle = corFase;
+  g.beginPath();
+  g.moveTo(xBarra + lBarra + 1, yAlt);
+  g.lineTo(w - 2, yAlt - 7);
+  g.lineTo(w - 2, yAlt + 7);
+  g.closePath();
+  g.fill();
+}
+
+function rotuloTempo(t) {
+  if (tLancamento === null) return mmss(t - serie.t[0]);
+  const d = t - tLancamento;
+  return (d < -0.5 ? 'T−' : 'T+') + mmss(Math.abs(d));
+}
+
+function desenharGrafico() {
+  const cv = $('#grafico');
+  const { g, w, h } = prepararCanvas(cv);
+  const tinta2 = cor('--tinta-2');
+  g.font = '12px ' + cor('--corpo');
+  const ts = serie.t;
+  if (ts.length < 2) {
+    g.fillStyle = tinta2; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('O gráfico aparece quando chegarem os primeiros pacotes.', w / 2, h / 2);
+    return;
+  }
+  const config = {
+    alt:  { un: 'altitude (m)', casas: 0, linhas: [{ d: serie.alt, cor: cor('--ceu') }] },
+    vel:  { un: 'velocidade vertical (m/s)', casas: 0, linhas: [{ d: serie.vel, cor: cor('--ceu') }] },
+    acel: { un: 'aceleração (g)', casas: 1, linhas: [
+      { d: serie.ax, cor: cor('--ceu'), nome: 'X' },
+      { d: serie.ay, cor: cor('--ocre'), nome: 'Y' },
+      { d: serie.az, cor: cor('--verde'), nome: 'Z' }] },
+    rssi: { un: 'intensidade do sinal (dBm)', casas: 0, linhas: [
+      { d: serie.rssiSx, cor: cor('--ceu'), nome: 'SX1276' },
+      { d: serie.rssiRy, cor: cor('--ocre'), nome: 'RYLR998' }],
+            limite: SENSIBILIDADE[info.sf] },
+  }[aba];
+
+  const tMax = ts[ts.length - 1];
+  let tMin = janela ? Math.max(ts[0], tMax - janela) : ts[0];
+  if (tMax - tMin < 10) tMin = tMax - 10;
+  let i0 = 0, hi = ts.length;
+  while (i0 < hi) { const m = (i0 + hi) >> 1; if (ts[m] < tMin) i0 = m + 1; else hi = m; }
+
+  let yMin = Infinity, yMax = -Infinity;
+  for (const s of config.linhas) {
+    for (let i = i0; i < ts.length; i++) {
+      const v = s.d[i];
+      if (Number.isFinite(v)) { if (v < yMin) yMin = v; if (v > yMax) yMax = v; }
+    }
+  }
+  if (config.limite !== undefined) { yMin = Math.min(yMin, config.limite); yMax = Math.max(yMax, config.limite); }
+  if (!Number.isFinite(yMin)) { yMin = 0; yMax = 1; }
+  if (yMax - yMin < 1e-6) { yMin -= 1; yMax += 1; }
+  const folga = (yMax - yMin) * 0.08;
+  yMin -= folga; yMax += folga;
+
+  const esq = 52, dir = 12, topo = 24, base = 24;
+  const X = (t) => esq + (t - tMin) / (tMax - tMin) * (w - esq - dir);
+  const Y = (v) => topo + (yMax - v) / (yMax - yMin) * (h - topo - base);
+
+  g.strokeStyle = cor('--linha'); g.lineWidth = 1; g.fillStyle = tinta2;
+  const py = passoBonito(yMax - yMin, 4);
+  const casasY = py >= 1 ? 0 : (py >= 0.1 ? 1 : 2);
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let v = Math.ceil(yMin / py) * py; v <= yMax; v += py) {
+    const y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(esq, y); g.lineTo(w - dir, y); g.stroke();
+    g.fillText(fmt(v, casasY), esq - 6, y);
+  }
+  const px = passoBonito(tMax - tMin, Math.max(2, Math.floor(w / 110)));
+  const ref = tLancamento === null ? ts[0] : tLancamento;
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let k = Math.ceil((tMin - ref) / px), t = ref + k * px; t <= tMax; k++, t = ref + k * px) {
+    const x = Math.round(X(t)) + 0.5;
+    g.beginPath(); g.moveTo(x, topo); g.lineTo(x, h - base); g.stroke();
+    g.fillText(rotuloTempo(t), x, h - base + 6);
+  }
+  g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText(config.un, esq, 4);
+
+  if (config.limite !== undefined) {
+    const y = Math.round(Y(config.limite)) + 0.5;
+    g.strokeStyle = cor('--vermelho'); g.setLineDash([5, 4]);
+    g.beginPath(); g.moveTo(esq, y); g.lineTo(w - dir, y); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = cor('--vermelho'); g.textAlign = 'right'; g.textBaseline = 'bottom';
+    g.fillText('limite do receptor', w - dir, y - 3);
+  }
+
+  // Linhas: por coluna de pixel guarda primeiro, minimo, maximo e ultimo,
+  // para picos curtos (queima do motor, apogeu) nunca sumirem do desenho.
+  for (const s of config.linhas) {
+    g.strokeStyle = s.cor; g.lineWidth = 2; g.lineJoin = 'round';
+    g.beginPath();
+    let col = null, pri = 0, mn = 0, mx = 0, ult = 0, iniciou = false;
+    const despejar = () => {
+      for (const v of [pri, mn, mx, ult]) {
+        if (!iniciou) { g.moveTo(col, Y(v)); iniciou = true; } else g.lineTo(col, Y(v));
+      }
+    };
+    for (let i = i0; i < ts.length; i++) {
+      const v = s.d[i];
+      if (!Number.isFinite(v)) continue;
+      const x = Math.round(X(ts[i]));
+      if (x !== col) {
+        if (col !== null) despejar();
+        col = x; pri = mn = mx = ult = v;
+      } else {
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+        ult = v;
+      }
+    }
+    if (col !== null) despejar();
+    g.stroke();
+  }
+
+  if (config.linhas.length > 1) {
+    let x = w - dir;
+    g.textBaseline = 'top'; g.textAlign = 'right';
+    for (const s of [...config.linhas].reverse()) {
+      g.fillStyle = s.cor; g.fillText(s.nome, x, 4);
+      x -= g.measureText(s.nome).width + 6;
+      g.fillRect(x - 12, 10, 12, 3);
+      x -= 20;
+    }
+  }
+}
+
+function desenharTrajeto() {
+  const { g, w, h } = prepararCanvas($('#trajeto'));
+  const tinta2 = cor('--tinta-2');
+  g.font = '12px ' + cor('--corpo');
+  if (!trajeto.length) {
+    g.fillStyle = tinta2; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('Sem posição de GPS ainda.', w / 2, h / 2);
+    return;
+  }
+  let minE = 0, maxE = 0, minN = 0, maxN = 0;
+  for (const p of trajeto) {
+    if (p.e < minE) minE = p.e; if (p.e > maxE) maxE = p.e;
+    if (p.n < minN) minN = p.n; if (p.n > maxN) maxN = p.n;
+  }
+  const vao = Math.max(maxE - minE, maxN - minN, 40);
+  const cx = (minE + maxE) / 2, cy = (minN + maxN) / 2;
+  const esc = (Math.min(w, h) - 48) / vao;
+  const X = (e) => w / 2 + (e - cx) * esc;
+  const Y = (n) => h / 2 - (n - cy) * esc;
+
+  g.strokeStyle = cor('--ceu'); g.lineWidth = 2; g.lineJoin = 'round';
+  g.beginPath();
+  trajeto.forEach((p, i) => (i ? g.lineTo(X(p.e), Y(p.n)) : g.moveTo(X(p.e), Y(p.n))));
+  g.stroke();
+
+  g.fillStyle = cor('--superficie'); g.strokeStyle = cor('--tinta'); g.lineWidth = 2;
+  g.beginPath(); g.arc(X(0), Y(0), 5, 0, 2 * Math.PI); g.fill(); g.stroke();
+  g.fillStyle = cor('--tinta'); g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillText('rampa', X(0) + 9, Y(0));
+
+  const u = trajeto[trajeto.length - 1];
+  g.fillStyle = cor(VAR_FASE[atual ? atual.fase : 0]);
+  g.beginPath(); g.arc(X(u.e), Y(u.n), 7, 0, 2 * Math.PI); g.fill();
+
+  g.fillStyle = tinta2; g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText('N ↑', 10, 10);
+  const metros = passoBonito((w * 0.25) / esc, 1);
+  const largura = metros * esc;
+  g.strokeStyle = tinta2; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(10, h - 14); g.lineTo(10 + largura, h - 14); g.stroke();
+  g.textBaseline = 'bottom';
+  g.fillText(fmt(metros, 0) + ' m', 10, h - 18);
+}
+
+// ---------- gravacao ----------
+function mensagem(t) { texto('#grav-msg', t); }
+
+async function acaoGravacao(acao) {
+  mensagem('');
+  const url = '/api/gravacao/' + acao + (acao === 'iniciar' ? '?epoch_ms=' + Date.now() : '');
+  try {
+    const g = await buscarJson(url, { method: 'POST' });
+    if (status) { status.gravacao = g; atualizarGravacao(); }
+  } catch (e) {
+    mensagem(e.name === 'AbortError' ? 'A base não respondeu. Tente de novo.' : e.message);
+  }
+}
+
+function carimbo() {
+  const d = new Date(), z = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds());
+}
+
+function baixarTela() {
+  if (!linhasTela.length) return;
+  const csv = 'hora_navegador,' + colunas.join(',') + '\n' + linhasTela.join('\n') + '\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'voo_tela_' + carimbo() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+function ligarControles() {
+  $('#grav-iniciar').addEventListener('click', () => acaoGravacao('iniciar'));
+  $('#grav-parar').addEventListener('click', () => acaoGravacao('parar'));
+  $('#grav-apagar').addEventListener('click', () => {
+    if (confirm('Apagar a gravação guardada na estação base? Não dá para desfazer.')) acaoGravacao('apagar');
+  });
+  $('#grav-baixar').addEventListener('click', () => { window.location.href = '/baixar.csv'; });
+  $('#baixar-tela').addEventListener('click', baixarTela);
+  document.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => {
+    aba = b.dataset.aba;
+    document.querySelectorAll('[data-aba]').forEach((o) => o.setAttribute('aria-selected', String(o === b)));
+    agendarDesenho();
+  }));
+  document.querySelectorAll('[data-janela]').forEach((b) => b.addEventListener('click', () => {
+    janela = Number(b.dataset.janela);
+    document.querySelectorAll('[data-janela]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    agendarDesenho();
+  }));
+  window.addEventListener('resize', agendarDesenho);
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', agendarDesenho);
+}
+
+async function iniciar() {
+  ligarControles();
+  agendarDesenho();
+  while (!colunas) {
+    try {
+      info = await buscarJson('/api/info');
+      colunas = info.colunas.split(',');
+    } catch (e) {
+      mostrarConexao(false);
+      await esperar(1500);
+    }
+  }
+  fetch('/api/hora?epoch_ms=' + Date.now(), { method: 'POST' }).catch(() => {});
+  $('#simulacao').hidden = !info.simulacao;
+  texto('#escuta', 'SX1276 e RYLR998 escutam em ' + fmt(info.freq_mhz, 1) + ' MHz, SF' + info.sf +
+        ', sync 0x' + info.sync.toString(16).toUpperCase() + ' (NETWORKID ' + info.sync + '), preâmbulo ' +
+        info.preambulo + '. CanSat = endereço ' + info.end_cansat + '.');
+  setInterval(() => { atualizarEnlace(); atualizarSinal(); atualizarAlertas(); }, 1000);
+  ciclo();
+}
+
+iniciar();
+</script>
+</body>
+</html>

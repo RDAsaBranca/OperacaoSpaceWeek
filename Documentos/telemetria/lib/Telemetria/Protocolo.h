@@ -9,7 +9,7 @@
 #include <stddef.h>
 
 #define TLM_MAGIC   0xA5   // primeiro byte de todo pacote valido
-#define TLM_VERSAO  2      // v2: BNO055 (quaternion + calibracao)
+#define TLM_VERSAO  3      // v3: magnetometro do BNO055 (v2: quaternion + calibracao)
 
 #define QUAT_ESCALA 16384.0f  // quaternion: 1,0 = 16384 (formato nativo do BNO055)
 
@@ -45,6 +45,7 @@ struct __attribute__((packed)) PacoteTelemetria {
   int16_t  tempC100;      // temperatura do BMP280 [0,01 C]
   int16_t  acelMg[3];     // aceleracao X, Y, Z [mg]
   int16_t  giroDps10[3];  // velocidade angular X, Y, Z [0,1 graus/s]
+  int16_t  magUT10[3];    // campo magnetico X, Y, Z [0,1 uT] (BNO055: +-1300 uT em X/Y, +-2500 em Z)
   int16_t  quat[4];       // orientacao w, x, y, z [x 16384]
   uint8_t  calibracao;    // BNO055: sistema<<6 | giro<<4 | acel<<2 | mag (cada 0..3)
   int32_t  latE7;         // latitude  [graus * 1e7]
@@ -55,7 +56,7 @@ struct __attribute__((packed)) PacoteTelemetria {
   uint16_t crc;           // CRC16-CCITT de todos os bytes anteriores
 };
 
-static_assert(sizeof(PacoteTelemetria) == 58, "Tamanho do pacote mudou: revise os dois lados");
+static_assert(sizeof(PacoteTelemetria) == 64, "Tamanho do pacote mudou: revise os dois lados");
 
 // Preenche magic, versao e CRC. Chame por ultimo, antes de transmitir.
 void pacoteFinalizar(PacoteTelemetria& p);

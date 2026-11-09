@@ -5,6 +5,7 @@ Um único projeto PlatformIO com dois firmwares e uma ferramenta para o PC:
 - **foguete** (ESP32-C3 SuperMini): lê BMP280, BNO055, GPS ATGM336H e bateria a 50 Hz, estima a fase do voo e transmite telemetria pelo SX1276 a 5 Hz. Não há armazenamento a bordo: o CanSat cai no oceano e não é recuperado, então tudo que importa vai pelo rádio.
 - **base** (ESP32 + SX1276, nada mais): recebe, valida (CRC do LoRa + CRC próprio) e conta perdas. Também cria a própria rede Wi-Fi e serve um **dashboard** que abre no navegador de qualquer celular ou notebook, sem internet. Pelo dashboard dá para acompanhar o voo ao vivo e gravar os dados na memória da base quando for pedido.
 - **ferramentas/registrar_serial.py** (opcional): grava no PC a cópia que a base também envia pela USB.
+- **teste_enlace/** (projeto separado): teste do enlace com um segundo receptor na base, o REYAX RYLR998. Tem um CanSat simulado que transmite o pacote real com dados fictícios e uma base que recebe pelo SX1276 e pelo RYLR998 ao mesmo tempo. Ver `teste_enlace/README.md` e `docs/arquitetura_enlace_reyax.md`.
 
 ## Componentes da missão
 
@@ -28,7 +29,7 @@ telemetria-foguete/
 ├── platformio.ini            ambientes [env:foguete], [env:foguete_voo] e [env:base]
 ├── lib/Telemetria/           CÓDIGO COMPARTILHADO (compilado nos dois)
 │   ├── ConfigLoRa.h          frequência, SF, BW, potência, período
-│   ├── Protocolo.h           pacote de 58 bytes, estados, bits de status
+│   ├── Protocolo.h           pacote de 64 bytes (versão 3), estados, bits de status
 │   └── Protocolo.cpp         CRC16, validação, conversão para CSV
 ├── src/foguete/              ESP32-C3 SuperMini
 │   ├── main.cpp              agendador: sensores 50 Hz, TX a cada 200 ms, diagnóstico 1 Hz
@@ -50,9 +51,12 @@ telemetria-foguete/
 │   └── dashboard_html.h      GERADO a partir de web/dashboard.html
 ├── web/
 │   └── dashboard.html        o dashboard (HTML, CSS e JavaScript num arquivo só)
-└── ferramentas/
-    ├── gerar_dashboard.py    embute o dashboard no firmware (roda sozinho)
-    └── registrar_serial.py   grava a cópia USB da base no PC (opcional)
+├── ferramentas/
+│   ├── gerar_dashboard.py    embute o dashboard no firmware (roda sozinho)
+│   └── registrar_serial.py   grava a cópia USB da base no PC (opcional)
+├── docs/
+│   └── arquitetura_enlace_reyax.md   enlace SX1276 -> SX1276 + RYLR998 (pesquisa e projeto)
+└── teste_enlace/             PROJETO SEPARADO: teste do enlace com o RYLR998
 ```
 
 Tudo que precisa ser igual nos dois lados (rádio e formato do pacote) fica em `lib/Telemetria`.
@@ -109,7 +113,7 @@ O BNO055 tem uma limitação importante para foguetes: **nos modos de fusão (qu
 | 0 (padrão) | sim, fusão NDOF | satura em ±4 g |
 | 1 | não | até ±16 g |
 
-A detecção de lançamento funciona nos dois modos (ela usa 2,5 g). A calibração do BNO055 (0 a 3 para sistema, giroscópio, acelerômetro e magnetômetro) vai na telemetria. No modo NDOF, o magnetômetro só calibra com movimento, e motor ou partes metálicas por perto atrapalham a bússola.
+A detecção de lançamento funciona nos dois modos (ela usa 2,5 g). O campo magnético medido pelo BNO055 (X, Y e Z em µT, nos dois modos) e a calibração (0 a 3 para sistema, giroscópio, acelerômetro e magnetômetro) vão na telemetria. No modo NDOF, o magnetômetro só calibra com movimento, e motor ou partes metálicas por perto atrapalham a bússola.
 
 A orientação mostrada na base (rolagem, arfagem e guinada) depende de como o sensor está montado. Se o eixo longo do foguete for o eixo X ou Y do BNO055, a arfagem fica perto de ±90° com o foguete na vertical, onde os ângulos de Euler perdem precisão. Para análise, use o quaternion do CSV.
 
@@ -127,7 +131,7 @@ Com `pio device monitor -e foguete`, o ambiente de testes (`[env:foguete]`) most
 ```
 ---- t=12.0 s | RAMPA | alt 0.0 m (max 0.0) | v +0.0 m/s | pacote seq 55 ----
 [BMP280] ok    | 94512 Pa | 24.87 C
-[BNO055] ok    | acel +0.01 -0.02 +1.00 g | giro +0.1 +0.0 -0.1 graus/s | quat +1.000 ... | cal S0 G3 A0 M0
+[BNO055] ok    | acel +0.01 -0.02 +1.00 g | giro +0.1 +0.0 -0.1 graus/s | mag +23.1 -8.7 -4.6 uT | quat +1.000 ... | cal S0 G3 A0 M0
 [GPS]    ok    | 48 frases validas, 0 com erro | 0 satelites | sem posicao ainda (...)
 [BAT]    3.95 V (pino GPIO1: 1975 mV)
 [LoRa]   ok    | 55 enviados | 0 pulados (ocupado) | 0 erros | 0 timeouts
@@ -185,7 +189,7 @@ Quem abre o dashboard no meio do voo recebe os últimos 2 minutos que a base gua
 
 **Salvar os dados**, de duas formas:
 
-- **Gravação na estação base:** os botões "Iniciar gravação" e "Parar gravação" guardam os pacotes na memória interna da ESP32 (cerca de 80 minutos a 5 Hz). A gravação continua mesmo se o celular desconectar ou a tela apagar. Depois de parar, "Baixar CSV" entrega o arquivo com a hora UTC de cada pacote (a base acerta o relógio pelo celular) e "Apagar gravação" libera o espaço.
+- **Gravação na estação base:** os botões "Iniciar gravação" e "Parar gravação" guardam os pacotes na memória interna da ESP32 (cerca de 75 minutos a 5 Hz). A gravação continua mesmo se o celular desconectar ou a tela apagar. Depois de parar, "Baixar CSV" entrega o arquivo com a hora UTC de cada pacote (a base acerta o relógio pelo celular) e "Apagar gravação" libera o espaço.
 - **Baixar dados desta tela:** salva no aparelho tudo o que a página recebeu desde que foi aberta. Serve de reserva se ninguém lembrou de iniciar a gravação.
 
 Por dentro, a base roda duas tarefas em paralelo:
@@ -201,14 +205,14 @@ O dashboard pede os dados novos 4 vezes por segundo pela rota `/api/dados`. A ba
 
 ## Rádio: alcance x taxa
 
-Os parâmetros ficam em `lib/Telemetria/ConfigLoRa.h`. Cada passo de SF dá cerca de 2,5 dB a mais de sensibilidade (mais alcance), mas quase dobra o tempo no ar. Valores para o pacote de 58 bytes com BW 125 kHz e CR 4/5:
+Os parâmetros ficam em `lib/Telemetria/ConfigLoRa.h`. Cada passo de SF dá cerca de 2,5 dB a mais de sensibilidade (mais alcance), mas quase dobra o tempo no ar. Valores para o pacote de 64 bytes com BW 125 kHz, CR 4/5 e preâmbulo 8:
 
 | SF | Tempo no ar | `TLM_PERIODO_MS` sugerido | Taxa |
 |---|---|---|---|
-| 7 | 113 ms | 200 | 5 Hz |
-| 8 | 195 ms | 300 | ~3 Hz |
-| 9 | 370 ms | 500 | 2 Hz |
-| 10 | 657 ms | 1000 | 1 Hz |
+| 7 | 118 ms | 200 | 5 Hz |
+| 8 | 216 ms | 300 | ~3 Hz |
+| 9 | 390 ms | 500 | 2 Hz |
+| 10 | 698 ms | 1000 | 1 Hz |
 
 O foguete imprime o tempo no ar real ao ligar e avisa se o período estiver curto demais.
 
