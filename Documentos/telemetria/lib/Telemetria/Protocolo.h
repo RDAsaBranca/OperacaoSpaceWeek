@@ -1,6 +1,5 @@
 // Protocolo.h
-// Formato binario do pacote de telemetria, usado pelos dois firmwares
-// e tambem pelo registro na flash W25Q128 do foguete.
+// Formato binario do pacote de telemetria, usado pelos dois firmwares.
 //
 // O pacote e uma struct "packed" (sem bytes de preenchimento). Funciona
 // direto entre ESP32 e ESP32-C3 porque os dois sao little-endian.
@@ -10,7 +9,7 @@
 #include <stddef.h>
 
 #define TLM_MAGIC   0xA5   // primeiro byte de todo pacote valido
-#define TLM_VERSAO  2      // v2: BNO055 (quaternion + calibracao) e status da flash
+#define TLM_VERSAO  2      // v2: BNO055 (quaternion + calibracao)
 
 #define QUAT_ESCALA 16384.0f  // quaternion: 1,0 = 16384 (formato nativo do BNO055)
 
@@ -29,14 +28,14 @@ enum : uint8_t {
   STATUS_GPS_OK      = 1 << 2,  // ATGM336H enviando dados
   STATUS_GPS_FIX     = 1 << 3,  // GPS com posicao recente (< 3 s)
   STATUS_ORIENT_OK   = 1 << 4,  // quaternion valido (BNO055 em modo fusao)
-  STATUS_FLASH_OK    = 1 << 5,  // gravando na W25Q128
-  STATUS_FLASH_CHEIA = 1 << 6,  // memoria cheia (parou de gravar)
+  // Bits 5 e 6 eram da flash W25Q128, que saiu do projeto. Ficam livres
+  // (sempre 0); o formato do pacote nao mudou.
 };
 
 struct __attribute__((packed)) PacoteTelemetria {
   uint8_t  magic;         // TLM_MAGIC
   uint8_t  versao;        // TLM_VERSAO
-  uint16_t seq;           // sequencia (radio) ou numero da amostra (flash)
+  uint16_t seq;           // sequencia dos pacotes de radio
   uint32_t tempoMs;       // millis() do foguete
   uint8_t  estado;        // EstadoVoo
   uint8_t  status;        // bits STATUS_*
@@ -72,5 +71,5 @@ const char* nomeEstado(uint8_t estado);
 extern const char* const TLM_COLUNAS;
 
 // Converte o pacote em uma linha CSV, em unidades fisicas (sem '\n').
-// Usado pela base (telemetria) e pelo foguete (download da flash).
+// Usado pela base (copia pela USB e gravacao).
 int pacoteParaCsv(const PacoteTelemetria& p, char* buf, size_t tamanho);

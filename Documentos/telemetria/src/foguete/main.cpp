@@ -1,9 +1,13 @@
 // ============================================================
 //  FOGUETE - ESP32-C3 SuperMini
-//  BMP280 + BNO055 + ATGM336H + W25Q128 + LoRa SX1276
+//  BMP280 + BNO055 + ATGM336H + LoRa SX1276 + bateria (ADC)
 //
-//  Le os sensores a 50 Hz, grava o voo na flash e transmite
-//  telemetria a cada TLM_PERIODO_MS.
+//  Le os sensores a 50 Hz e transmite telemetria a cada
+//  TLM_PERIODO_MS. Nao ha armazenamento a bordo: o CanSat cai no
+//  mar e nao e recuperado, entao os dados vao todos pelo radio.
+//
+//  Nenhuma falha de componente trava o firmware. O que nao responder
+//  fica marcado no status do pacote e no diagnostico, e o resto segue.
 // ============================================================
 #include <Arduino.h>
 #include <SPI.h>
@@ -16,18 +20,16 @@
 #include "radio_tx.h"
 #include "sensores.h"
 #include "estado_voo.h"
-#include "registro_voo.h"
 #include "comandos.h"
 
-static const uint32_t PERIODO_SENSORES_MS = 20;    // 50 Hz
-static const uint32_t PERIODO_LOG_MS      = 1000;  // diagnostico na USB
+static const uint32_t PERIODO_SENSORES_MS      = 20;    // 50 Hz
+static const uint32_t PERIODO_LOG_MS           = 1000;  // diagnostico na USB
+static const uint32_t PERIODO_RETENTAR_RADIO_MS = 5000; // se o SX1276 nao respondeu
 
 static LeituraSensores  leitura;
-static PacoteTelemetria pacoteTx, pacoteFlash;
+static PacoteTelemetria pacoteTx;
 static uint16_t seqTx = 0;       // sequencia dos pacotes de radio
-static uint16_t amostra = 0;     // contador das amostras gravadas na flash
-static uint32_t tSensores = 0, tTx = 0, tLog = 0;
-static uint32_t txPulados = 0;   // vezes em que o radio ainda estava ocupado
+static uint32_t tSensores = 0, tTx = 0, tLog = 0, tRadio = 0;
 
 static int16_t saturar16(float v) {
   if (v > 32767.0f)  return 32767;
@@ -40,7 +42,7 @@ static void montarPacote(PacoteTelemetria& p, uint16_t seq) {
   p.seq        = seq;
   p.tempoMs    = millis();
   p.estado     = estadoVooAtual();
-  p.status     = leitura.status | registroStatus();
+  p.status     = leitura.status;
   p.altitudeCm = (int32_t)lroundf(estadoVooAltitudeM() * 100.0f);
   p.altMaxCm   = (int32_t)lroundf(estadoVooAltMaxM() * 100.0f);
   p.velVertDms = saturar16(estadoVooVelVertMs() * 10.0f);
@@ -61,42 +63,55 @@ static void montarPacote(PacoteTelemetria& p, uint16_t seq) {
   pacoteFinalizar(p);
 }
 
-// LoRa e flash dividem o SPI. Os dois CS precisam estar em nivel alto
-// ANTES de qualquer transacao, senao os dois chips respondem juntos no MISO.
+// O CS do radio precisa estar em nivel alto antes da primeira transacao SPI.
 static void prepararSpi() {
   pinMode(PIN_LORA_NSS, OUTPUT);
   digitalWrite(PIN_LORA_NSS, HIGH);
-  pinMode(PIN_FLASH_CS, OUTPUT);
-  digitalWrite(PIN_FLASH_CS, HIGH);
   SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+}
+
+static void iniciarRadio() {
+  if (!radioIniciar()) return;
+  const uint32_t toaUs = radioTempoNoArUs(sizeof(PacoteTelemetria));
+  LOG("[LoRa] ok: %.1f MHz SF%d BW%.0f | pacote %u bytes | tempo no ar %.1f ms | periodo %d ms\n",
+      LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, (unsigned)sizeof(PacoteTelemetria),
+      toaUs / 1000.0f, TLM_PERIODO_MS);
+  if (toaUs / 1000 >= TLM_PERIODO_MS) {
+    LOG("[LoRa] AVISO: tempo no ar >= periodo. Aumente TLM_PERIODO_MS ou reduza o SF.\n");
+  }
+}
+
+// Bloco de diagnostico, 1x por segundo: uma linha por componente.
+// Com DIAGNOSTICO_USB=0 (ambiente foguete_voo) nada disso e compilado.
+static void imprimirDiagnostico() {
+#if DIAGNOSTICO_USB
+  Serial.printf("\n---- t=%.1f s | %s | alt %.1f m (max %.1f) | v %+.1f m/s | pacote seq %u ----\n",
+                millis() / 1000.0f, nomeEstado(estadoVooAtual()), estadoVooAltitudeM(),
+                estadoVooAltMaxM(), estadoVooVelVertMs(), seqTx);
+  sensoresImprimirDiagnostico(leitura, Serial);
+  radioImprimirDiagnostico(Serial);
+#endif
 }
 
 void setup() {
   Serial.begin(115200);
+#if DIAGNOSTICO_USB
   delay(1500);  // tempo para o USB-CDC da C3 enumerar no PC
+#endif
   LOG("\n=== FOGUETE: telemetria LoRa SX1276 ===\n");
 
   prepararSpi();
   sensoresIniciar();
 
   float p0 = sensoresPressaoMedia(50);
-  LOG("[VOO] pressao de referencia na rampa: %.1f Pa\n", p0);
+  LOG("[VOO] pressao de referencia na rampa: %.1f Pa%s\n", p0,
+      p0 > 0 ? "" : " (sem barometro: altitude fica em 0)");
   estadoVooIniciar(p0);
 
-  registroIniciar();  // sem flash o foguete continua: so nao grava
+  iniciarRadio();  // se falhar, o loop() tenta de novo a cada 5 s
+  tRadio = millis();
 
-  while (!radioIniciar()) {
-    LOG("[RADIO] tentando de novo em 2 s...\n");
-    delay(2000);
-  }
-  uint32_t toaUs = radioTempoNoArUs(sizeof(PacoteTelemetria));
-  LOG("[RADIO] ok | %.1f MHz SF%d BW%.0f | pacote %u bytes | tempo no ar %.1f ms | periodo %d ms\n",
-      LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, (unsigned)sizeof(PacoteTelemetria),
-      toaUs / 1000.0f, TLM_PERIODO_MS);
-  if (toaUs / 1000 >= TLM_PERIODO_MS) {
-    LOG("[RADIO] AVISO: tempo no ar >= periodo. Aumente TLM_PERIODO_MS ou reduza o SF.\n");
-  }
-  LOG("# comandos pela USB: info | baixar | apagar confirmo | ajuda\n");
+  LOG("# comandos pela USB: info | ajuda\n");
 }
 
 void loop() {
@@ -106,36 +121,27 @@ void loop() {
   radioAtualizar();
   comandosAtualizar();
 
+  if (!radioPronto() && agora - tRadio >= PERIODO_RETENTAR_RADIO_MS) {
+    tRadio = agora;
+    iniciarRadio();
+  }
+
   if (agora - tSensores >= PERIODO_SENSORES_MS) {
     tSensores = agora;
     sensoresLer(leitura);
     estadoVooAtualizar(leitura, agora);
-    montarPacote(pacoteFlash, amostra++);
-    registroAmostra(pacoteFlash, leitura.pressaoPa, agora);
   }
 
-  if (agora - tTx >= TLM_PERIODO_MS) {
+  if (radioPronto() && agora - tTx >= TLM_PERIODO_MS) {
     tTx = agora;
     montarPacote(pacoteTx, seqTx);
     if (radioEnviar(reinterpret_cast<const uint8_t*>(&pacoteTx), sizeof(pacoteTx))) {
       seqTx++;  // so conta o que realmente foi ao ar
-    } else {
-      txPulados++;
     }
   }
 
   if (agora - tLog >= PERIODO_LOG_MS) {
     tLog = agora;
-    const uint8_t c = leitura.calibracao;
-    LOG("[TLM] seq=%u %s alt=%.1f m max=%.1f m v=%.1f m/s | baro=%d imu=%d orient=%d cal=S%uG%uA%uM%u"
-        " | gps=%d fix=%d sats=%u | bat=%u mV | flash=%lu reg | pulados=%lu\n",
-        seqTx, nomeEstado(estadoVooAtual()), estadoVooAltitudeM(), estadoVooAltMaxM(),
-        estadoVooVelVertMs(),
-        !!(leitura.status & STATUS_BARO_OK), !!(leitura.status & STATUS_IMU_OK),
-        !!(leitura.status & STATUS_ORIENT_OK),
-        (c >> 6) & 3u, (c >> 4) & 3u, (c >> 2) & 3u, c & 3u,
-        !!(leitura.status & STATUS_GPS_OK), !!(leitura.status & STATUS_GPS_FIX),
-        leitura.satelites, leitura.bateriaMv, (unsigned long)registroUsados(),
-        (unsigned long)txPulados);
+    imprimirDiagnostico();
   }
 }

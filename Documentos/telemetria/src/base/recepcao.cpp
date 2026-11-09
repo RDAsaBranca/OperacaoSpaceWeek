@@ -125,7 +125,7 @@ static void simularPacote(PacoteTelemetria& p, uint16_t seq, float& rssi, float&
   p.tempoMs = millis();
   p.estado = estado;
   p.status = STATUS_BARO_OK | STATUS_IMU_OK | STATUS_GPS_OK | STATUS_GPS_FIX |
-             STATUS_ORIENT_OK | STATUS_FLASH_OK;
+             STATUS_ORIENT_OK;
   p.altitudeCm = (int32_t)lroundf(alt * 100.0f);
   p.altMaxCm   = (int32_t)lroundf(altMax * 100.0f);
   p.velVertDms = sat16(vel * 10.0f);

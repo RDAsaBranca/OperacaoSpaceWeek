@@ -1,11 +1,10 @@
 # Telemetria LoRa SX1276 para foguete
 
-Um único projeto PlatformIO com dois firmwares e duas ferramentas para o PC:
+Um único projeto PlatformIO com dois firmwares e uma ferramenta para o PC:
 
-- **foguete** (ESP32-C3 SuperMini): lê BMP280, BNO055, GPS ATGM336H e bateria a 50 Hz, estima a fase do voo, grava tudo na flash W25Q128 e transmite telemetria pelo SX1276 a 5 Hz.
+- **foguete** (ESP32-C3 SuperMini): lê BMP280, BNO055, GPS ATGM336H e bateria a 50 Hz, estima a fase do voo e transmite telemetria pelo SX1276 a 5 Hz. Não há armazenamento a bordo: o CanSat cai no oceano e não é recuperado, então tudo que importa vai pelo rádio.
 - **base** (ESP32 + SX1276, nada mais): recebe, valida (CRC do LoRa + CRC próprio) e conta perdas. Também cria a própria rede Wi-Fi e serve um **dashboard** que abre no navegador de qualquer celular ou notebook, sem internet. Pelo dashboard dá para acompanhar o voo ao vivo e gravar os dados na memória da base quando for pedido.
 - **ferramentas/registrar_serial.py** (opcional): grava no PC a cópia que a base também envia pela USB.
-- **ferramentas/baixar_flash.py**: depois do voo, baixa o registro completo da flash do foguete.
 
 ## Componentes da missão
 
@@ -15,7 +14,7 @@ Um único projeto PlatformIO com dois firmwares e duas ferramentas para o PC:
 | OBDH | IMU | BNO055 |
 | OBDH | Barômetro | BMP280 (módulo 5 V, 4 pinos) |
 | OBDH | GPS | ATGM336H-5N-31 |
-| OBDH | Armazenamento | W25Q128 (16 MB) |
+| OBDH | Armazenamento | nenhum (a W25Q128 tem lugar na PCB, mas não é soldada nem usada) |
 | EPS | Bateria | Panasonic NCR18650B |
 | EPS | Regulador | 134N3P (HT4928S) ou SX1308 |
 | EPS | Carregador | 134N3P (HT4928S) |
@@ -26,21 +25,19 @@ Um único projeto PlatformIO com dois firmwares e duas ferramentas para o PC:
 
 ```
 telemetria-foguete/
-├── platformio.ini            ambientes [env:foguete] e [env:base]
+├── platformio.ini            ambientes [env:foguete], [env:foguete_voo] e [env:base]
 ├── lib/Telemetria/           CÓDIGO COMPARTILHADO (compilado nos dois)
 │   ├── ConfigLoRa.h          frequência, SF, BW, potência, período
 │   ├── Protocolo.h           pacote de 58 bytes, estados, bits de status
 │   └── Protocolo.cpp         CRC16, validação, conversão para CSV
 ├── src/foguete/              ESP32-C3 SuperMini
-│   ├── main.cpp              agendador: sensores 50 Hz, flash, TX a cada 200 ms
-│   ├── pinos.h               mapa de pinos e modo do BNO055
+│   ├── main.cpp              agendador: sensores 50 Hz, TX a cada 200 ms, diagnóstico 1 Hz
+│   ├── pinos.h               mapa de pinos (esquemático V1.7) e modo do BNO055
 │   ├── log.h                 diagnóstico USB (desligável para o voo)
 │   ├── radio_tx.*            transmissão LoRa não bloqueante
 │   ├── sensores.*            BMP280, BNO055, ATGM336H, bateria
 │   ├── estado_voo.*          altitude filtrada, velocidade, fase do voo
-│   ├── flash_w25q.*          driver da W25Q128
-│   ├── registro_voo.*        caixa-preta: grava o voo na flash
-│   └── comandos.*            comandos pela USB (info, baixar, apagar)
+│   └── comandos.*            comandos pela USB (info, ajuda)
 ├── src/base/                 ESP32
 │   ├── main.cpp              inicia a memória, o Wi-Fi e a tarefa do rádio
 │   ├── config_base.h         nome e senha do Wi-Fi, histórico, modo simulação
@@ -55,34 +52,34 @@ telemetria-foguete/
 │   └── dashboard.html        o dashboard (HTML, CSS e JavaScript num arquivo só)
 └── ferramentas/
     ├── gerar_dashboard.py    embute o dashboard no firmware (roda sozinho)
-    ├── registrar_serial.py   grava a cópia USB da base no PC (opcional)
-    └── baixar_flash.py       baixa a flash do foguete após o voo
+    └── registrar_serial.py   grava a cópia USB da base no PC (opcional)
 ```
 
 Tudo que precisa ser igual nos dois lados (rádio e formato do pacote) fica em `lib/Telemetria`.
 
 ## Ligações do foguete (ESP32-C3 SuperMini)
 
-O SX1276 e a W25Q128 dividem o mesmo barramento SPI, cada um com seu CS. O BMP280 e o BNO055 dividem o I2C.
+Os pinos seguem o esquemático da PCB V1.7 (`hardware/backup_projetos/Projeto_V1_7.epro2`). O SX1276 usa o SPI e o BMP280 e o BNO055 dividem o I2C.
 
-| Função | Componente / pino | GPIO da C3 |
-|---|---|---|
-| SPI SCK | SX1276 SCK + W25Q128 CLK | 4 |
-| SPI MISO | SX1276 MISO + W25Q128 DO | 5 |
-| SPI MOSI | SX1276 MOSI + W25Q128 DI | 6 |
-| CS do rádio | SX1276 NSS | 7 |
-| Reset do rádio | SX1276 RESET | 10 |
-| Interrupção do rádio | SX1276 DIO0 | 3 |
-| CS da flash | W25Q128 /CS | 0 |
-| I2C SDA | BMP280 SDA + BNO055 SDA | 8 |
-| I2C SCL | BMP280 SCL + BNO055 SCL | 9 |
-| GPS TX → ESP RX | ATGM336H TX | 20 |
-| GPS RX ← ESP TX | ATGM336H RX | 21 |
-| Tensão da bateria | divisor 100k/100k a partir do B+ | 1 |
+| Função | Componente / pino | Net no esquemático | GPIO da C3 |
+|---|---|---|---|
+| SPI SCK | SX1276 SCK | SCK | 4 |
+| SPI MISO | SX1276 SO | MISO | 5 |
+| SPI MOSI | SX1276 SI | MOSI | 6 |
+| CS do rádio | SX1276 NSS | CS2 | 3 |
+| Reset do rádio | SX1276 RST | RESET | 2 |
+| Interrupção do rádio | SX1276 DIO0 | INTER | 0 |
+| I2C SDA | BMP280 SDA + BNO055 SDA | SDA | 8 |
+| I2C SCL | BMP280 SCL + BNO055 SCL | SCL | 9 |
+| GPS TX → ESP RX | ATGM336H TX | ESP_RX | 10 |
+| GPS RX ← ESP TX | ATGM336H RX | ESP_TX | 20 |
+| Tensão da bateria | divisor 100k/100k a partir do B+ | V_Bat | 1 |
+| (livre) | CS da W25Q128, que não é soldada | CS1 | 7 |
 
 Detalhes que costumam dar problema:
 
-- **W25Q128:** os pinos /WP e /HOLD do chip precisam ir em 3,3 V (vários módulos já fazem isso; no chip solto, não). Um resistor de 10 kΩ do /CS para 3,3 V mantém a flash desligada do barramento durante o boot.
+- **W25Q128:** não é usada e não deve ser soldada. O firmware não mexe no GPIO7. Se um dia ela for soldada sem ser usada, o /CS dela precisa ficar em nível alto, senão ela responde no MISO junto com o rádio.
+- **GPIO2 (reset do rádio):** é pino de *strapping* da C3, mas pelo datasheet (v2.4, Tabela 3-3, nota 2) ele não define o modo de boot. A Espressif só recomenda um pull-up contra ruído, então ligá-lo ao RESET do SX1276 não impede a placa de ligar.
 - **BMP280 de 5 V (4 pinos):** alimente o VIN com **3,3 V**. Esse módulo tem regulador próprio e funciona assim, e isso garante que os resistores de pull-up do I2C fiquem em 3,3 V. Se ele for ligado em 5 V, meça SDA e SCL em repouso: acima de 3,6 V pode danificar a ESP32-C3.
 - **BNO055:** pelo mesmo motivo, alimente com 3,3 V. O firmware procura o sensor em 0x28 e 0x29 (as placas GY-BNO055 costumam vir em 0x29).
 - **ATGM336H:** alimente com 3,3 V. Ele sai de fábrica em NMEA a 9600 baud, 1 Hz, que é o que o firmware espera.
@@ -94,10 +91,10 @@ Detalhes que costumam dar problema:
 NCR18650B ─► 134N3P / HT4928S (carga + boost) ─► 5 V ─► pino 5V da SuperMini
      │                                                    └─► regulador 3,3 V da placa
      └─► divisor 100k/100k ─► GPIO1                          ─► SX1276, BNO055, BMP280,
-                                                                ATGM336H, W25Q128
+                                                                ATGM336H
 ```
 
-O consumo de pico em 3,3 V fica em torno de 220 mA (rádio transmitindo a 17 dBm + GPS + sensores + gravação na flash). Confira se o regulador da sua SuperMini aguenta isso com folga. Com a NCR18650B (3.400 mAh), a autonomia esperada é da ordem de 10 horas ou mais.
+O consumo de pico em 3,3 V fica em torno de 200 mA (rádio transmitindo a 17 dBm + GPS + sensores). Confira se o regulador da sua SuperMini aguenta isso com folga. Com a NCR18650B (3.400 mAh), a autonomia esperada é da ordem de 10 horas ou mais.
 
 - **SX1308:** a saída desses módulos é ajustável por trimpot. Ajuste para 5,0 V com um multímetro **antes** de ligar a placa.
 - **Módulos de power bank (134N3P):** alguns desligam sozinhos quando a corrente de carga é baixa. Teste o foguete ligado por pelo menos uma hora no consumo real antes da missão.
@@ -116,41 +113,47 @@ A detecção de lançamento funciona nos dois modos (ela usa 2,5 g). A calibraç
 
 A orientação mostrada na base (rolagem, arfagem e guinada) depende de como o sensor está montado. Se o eixo longo do foguete for o eixo X ou Y do BNO055, a arfagem fica perto de ±90° com o foguete na vertical, onde os ângulos de Euler perdem precisão. Para análise, use o quaternion do CSV.
 
-## Registro na flash (caixa-preta)
+## Testes de bancada (diagnóstico pela USB)
 
-O LoRa sempre perde alguns pacotes, então o foguete grava tudo na W25Q128:
+O firmware do foguete funciona com qualquer combinação de componentes soldados. Nenhuma falha trava a execução:
 
-- Na rampa e depois do pouso: 1 registro por segundo.
-- Em voo (subida e descida): todas as amostras, a 50 Hz.
-- Pré-disparo: os 0,5 s anteriores à detecção do lançamento também são gravados, para não perder o início da queima.
-- Cada registro tem 64 bytes: o pacote completo, a pressão bruta e o número da sessão. A sessão aumenta cada vez que o foguete liga, então um reinício no ar não apaga nada.
-- A gravação só acrescenta, nunca sobrescreve. Cabem cerca de 87 minutos a 50 Hz.
-- O driver (`flash_w25q.*`) segue o datasheet do W25Q128FV: instruções SPI padrão em modo 0 a 8 MHz, endereço de 3 bytes, gravação em páginas de 256 bytes sem cruzar o limite da página. Ao ligar, ele desfaz qualquer proteção de escrita que o chip tenha (bits BP, TB, SEC, CMP e WPS) e confere cada gravação lendo de volta, porque o chip ignora em silêncio a gravação em área protegida.
+- **BMP280, BNO055:** são procurados no I2C ao ligar. O que não responder fica de fora, com o bit de status em 0, e o resto segue. Depois de soldar um componente, aperte RESET para ele ser procurado de novo.
+- **GPS:** sem GPS, a UART só não recebe nada.
+- **SX1276:** se não responder, o foguete segue lendo os sensores e tenta iniciar o rádio de novo a cada 5 s.
+- **Bateria:** o ADC sempre devolve um valor. Confira com um multímetro.
 
-Comandos pela USB do foguete (monitor serial a 115200, só funcionam no solo):
+Com `pio device monitor -e foguete`, o ambiente de testes (`[env:foguete]`) mostra ao ligar o resultado da procura de cada componente e, depois, um bloco por segundo com uma linha para cada um:
 
 ```
-info              estado dos sensores e da flash
-baixar            exporta os registros em CSV
-apagar confirmo   apaga a flash inteira (40 s a 200 s)
-ajuda             lista os comandos
+---- t=12.0 s | RAMPA | alt 0.0 m (max 0.0) | v +0.0 m/s | pacote seq 55 ----
+[BMP280] ok    | 94512 Pa | 24.87 C
+[BNO055] ok    | acel +0.01 -0.02 +1.00 g | giro +0.1 +0.0 -0.1 graus/s | quat +1.000 ... | cal S0 G3 A0 M0
+[GPS]    ok    | 48 frases validas, 0 com erro | 0 satelites | sem posicao ainda (...)
+[BAT]    3.95 V (pino GPIO1: 1975 mV)
+[LoRa]   ok    | 55 enviados | 0 pulados (ocupado) | 0 erros | 0 timeouts
 ```
 
-Antes da missão, apague a flash com `apagar confirmo`. Depois do voo, conecte o foguete e rode:
+Quando algo falha, a linha diz o quê, por exemplo `[BNO055] FALHA: nao encontrado na inicializacao`, `[GPS] FALHA: nenhum byte recebido (TX do GPS -> GPIO10?)`, `[GPS] AVISO: chegam bytes, mas nenhuma frase NMEA valida` (baud errado) ou `[LoRa] ok ... | DIO0 (GPIO0) nao chega?` (o rádio responde, mas a interrupção de fim de transmissão não chega).
+
+Comandos pela USB (monitor serial a 115200, só funcionam no solo):
 
 ```
-python ferramentas/baixar_flash.py COM6          (Windows)
-python ferramentas/baixar_flash.py /dev/ttyACM0  (Linux)
+info    estado do voo, dos sensores e do rádio
+ajuda   lista os comandos
 ```
+
+**Para o lançamento**, grave o ambiente `[env:foguete_voo]`. É o mesmo firmware com `DIAGNOSTICO_USB=0`: as mensagens de diagnóstico nem são compiladas. Os comandos continuam disponíveis.
 
 ## Compilar e gravar
 
 Com o VS Code + extensão PlatformIO, abra a pasta do projeto e use:
 
 ```
-pio run -e foguete -t upload     grava o foguete
-pio run -e base -t upload        grava a base
-pio device monitor -e base       vê a telemetria chegando
+pio run -e foguete -t upload       grava o foguete para testes (com diagnóstico)
+pio run -e foguete_voo -t upload   grava o foguete para o lançamento
+pio device monitor -e foguete      vê o diagnóstico do foguete
+pio run -e base -t upload          grava a base
+pio device monitor -e base         vê a telemetria chegando
 ```
 
 Na primeira gravação da C3 SuperMini, se ela não for reconhecida: segure o botão BOOT, conecte o USB (ou aperte RESET) e solte o BOOT.
@@ -176,7 +179,7 @@ O dashboard mostra:
 - gráficos de altitude, velocidade, aceleração e sinal (últimos 2 minutos ou o voo todo);
 - a posição GPS, com a trajetória vista de cima, a distância da rampa e links para abrir no app de mapas;
 - a atitude do BNO055 e o nível de calibração;
-- o estado de cada sistema do foguete e alertas em destaque: sem sinal (com a última posição), bateria baixa, sensor com falha, flash parada.
+- o estado de cada sistema do foguete e alertas em destaque: sem sinal (com a última posição), bateria baixa, sensor com falha.
 
 Quem abre o dashboard no meio do voo recebe os últimos 2 minutos que a base guarda na memória.
 
@@ -213,7 +216,7 @@ Verifique a faixa do seu módulo SX1276 SMD: o firmware vem em 915 MHz (faixa us
 
 ## Cópia da base pela USB
 
-Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma por pacote). Linhas `#` são para leitura humana: um resumo por segundo, orientação e calibração do BNO055, e alertas (sensor com falha, flash parada, bateria abaixo de 3,5 V, perda de sinal com a última posição GPS). Para gravar essa cópia no PC: `python ferramentas/registrar_serial.py COM5`.
+Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma por pacote). Linhas `#` são para leitura humana: um resumo por segundo, orientação e calibração do BNO055, e alertas (sensor com falha, bateria abaixo de 3,5 V, perda de sinal com a última posição GPS). Para gravar essa cópia no PC: `python ferramentas/registrar_serial.py COM5`.
 
 ```
 # [SUBIDA] alt 523.4 m (max 523.4) v +85.2 m/s | GPS fix 8 sats -23.5505123,-46.6333456 | bat 3.92 V | RSSI -87 dBm SNR 9.2 dB | perda 1.0%
@@ -222,20 +225,20 @@ Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma
 
 ## Antes de voar
 
-1. Com `info` no monitor serial do foguete, confirme que BMP280, BNO055, GPS e flash aparecem como ok. Para a W25Q128FV, o JEDEC deve ser `0xEF4018` e, depois de ligar, SR1 e SR2 devem mostrar `0x00` (sem proteção).
-2. Apague a flash (`apagar confirmo`) e confira que o dashboard não mostra o alerta "O foguete não está gravando na flash".
+1. Com o ambiente `foguete` gravado, confira no monitor serial que BMP280, BNO055, GPS, bateria e LoRa aparecem como `ok` no bloco de diagnóstico.
+2. Confira no dashboard que nenhum sistema aparece com falha.
 3. Teste de bancada com os dois lados ligados: no dashboard, a perda deve ficar perto de 0%.
 4. Faça uma gravação de teste na base, baixe o CSV e apague, para conferir o fluxo antes do dia.
 5. Teste de alcance no solo com o foguete montado e a antena na posição de voo. O dashboard mostra a "folga até o limite" do receptor; procure ter uns 20 dB na distância esperada.
 6. Levante o foguete 1 a 2 m e veja a altitude responder na base.
 7. Deixe o foguete ligado pelo tempo de espera previsto na rampa, para testar a bateria e o módulo de alimentação.
 8. Ajuste os limiares de `estado_voo.cpp` para o seu motor.
-9. Grave o foguete com `-DDEBUG_SERIAL=0` no `platformio.ini` para o voo.
+9. Grave o foguete com `pio run -e foguete_voo -t upload` para o voo.
 
 ## Cuidados
 
 - **Nunca transmita sem antena conectada**: isso pode queimar o amplificador do SX1276.
 - Fuselagem de fibra de carbono ou alumínio bloqueia o sinal de rádio e de GPS. Fibra de vidro, papelão e PLA deixam passar.
 - Antena de 1/4 de onda em 915 MHz: cerca de 8,2 cm. Na base, uma antena direcional (Yagi) aumenta muito o alcance.
-- Se a ESP32-C3 reiniciar no ar, ela recalibra o "zero" de altitude onde estiver. Os dados anteriores ficam salvos na flash (sessão anterior), mas capriche na alimentação e na fixação dos conectores.
+- Se a ESP32-C3 reiniciar no ar, ela recalibra o "zero" de altitude onde estiver. Como não há gravação a bordo, o que a base não recebeu se perde: capriche na alimentação e na fixação dos conectores.
 - A detecção de fase do voo é apenas **informativa**. Não use este código para acionar paraquedas: use um altímetro de recuperação dedicado e testado.

@@ -339,7 +339,7 @@ h2 { font: 600 16px/1.2 var(--instr); margin: 0 0 12px; }
 const $ = (s) => document.querySelector(s);
 const FASES = ['RAMPA', 'SUBIDA', 'DESCIDA', 'POUSADO'];
 const VAR_FASE = ['--rampa', '--ceu', '--ocre', '--verde'];
-const ST = { BARO: 1, IMU: 2, GPS: 4, FIX: 8, ORIENT: 16, FLASH: 32, FLASH_CHEIA: 64 };
+const ST = { BARO: 1, IMU: 2, GPS: 4, FIX: 8, ORIENT: 16 };
 const SENSIBILIDADE = { 7: -123, 8: -126, 9: -129, 10: -132, 11: -134.5, 12: -137 }; // SX1276, BW 125 kHz
 const MAX_PONTOS = 36000;
 const BATERIA_BAIXA = 3.5;
@@ -524,16 +524,11 @@ function atualizarSistemas() {
   if (!(s & ST.GPS)) gps = ['alerta', 'sem dados'];
   else if (!(s & ST.FIX)) gps = ['aviso', 'sem posição, ' + atual.sats + ' satélites'];
   else gps = ['ok', 'com posição, ' + atual.sats + ' satélites'];
-  let flash;
-  if (s & ST.FLASH_CHEIA) flash = ['alerta', 'cheia'];
-  else if (s & ST.FLASH) flash = ['ok', 'gravando'];
-  else flash = ['alerta', 'parada'];
   $('#sistemas').innerHTML =
     itemSistema('Bateria', v < BATERIA_BAIXA ? 'alerta' : 'ok', fmt(v, 2) + ' V, ~' + fmt(carga, 0) + ' %') +
     itemSistema('Barômetro BMP280', (s & ST.BARO) ? 'ok' : 'alerta', (s & ST.BARO) ? fmt(atual.temp_c, 1) + ' °C' : 'falha') +
     itemSistema('IMU BNO055', (s & ST.IMU) ? 'ok' : 'alerta', (s & ST.IMU) ? ((s & ST.ORIENT) ? 'com orientação' : 'sem orientação') : 'falha') +
-    itemSistema('GPS ATGM336H', gps[0], gps[1]) +
-    itemSistema('Flash W25Q128', flash[0], flash[1]);
+    itemSistema('GPS ATGM336H', gps[0], gps[1]);
 }
 
 function quatParaEuler(p) {
@@ -626,8 +621,6 @@ function atualizarAlertas() {
       if (atual.bat_v < BATERIA_BAIXA) lista.push(['', 'Bateria do foguete baixa: ' + fmt(atual.bat_v, 2) + ' V.']);
       if (!(atual.status & ST.BARO)) lista.push(['', 'Barômetro do foguete com falha.']);
       if (!(atual.status & ST.IMU)) lista.push(['', 'IMU do foguete com falha.']);
-      if (atual.status & ST.FLASH_CHEIA) lista.push(['aviso', 'A flash do foguete está cheia e parou de gravar.']);
-      else if (!(atual.status & ST.FLASH)) lista.push(['aviso', 'O foguete não está gravando na flash.']);
     }
   }
   const html = lista.map(([c, t]) => '<p' + (c ? ' class="' + c + '"' : '') + '>' + t + '</p>').join('');

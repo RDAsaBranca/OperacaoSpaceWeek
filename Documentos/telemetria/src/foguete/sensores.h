@@ -1,6 +1,10 @@
 // sensores.h - BMP280 (barometro), BNO055 (IMU), ATGM336H (GPS) e bateria
 // Para trocar algum sensor, mude so sensores.cpp: o resto do firmware
 // enxerga apenas a struct LeituraSensores.
+//
+// Sensor ausente nao trava nada: ele e procurado so na inicializacao e, se
+// nao responder, fica de fora (o bit STATUS_* correspondente fica em 0).
+// Depois de soldar/ligar um componente, aperte RESET para ele ser procurado.
 #pragma once
 #include <Arduino.h>
 
@@ -24,3 +28,5 @@ void  sensoresAtualizarGps();                   // chamar em todo loop()
 void  sensoresLer(LeituraSensores& l);
 float sensoresPressaoMedia(uint16_t amostras);  // referencia de solo (0 se sem barometro)
 void  sensoresImprimirResumo(Print& saida);     // quais sensores foram encontrados
+// Uma linha por componente (BMP280, BNO055, GPS, bateria) com a ultima leitura
+void  sensoresImprimirDiagnostico(const LeituraSensores& l, Print& saida);

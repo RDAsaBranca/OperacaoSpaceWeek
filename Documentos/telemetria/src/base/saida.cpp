@@ -53,7 +53,5 @@ void saidaLegivel(const PacoteTelemetria& p, float rssi, float snr,
 
   if (!(p.status & STATUS_BARO_OK)) Serial.println("# [ALERTA] barometro BMP280 com falha");
   if (!(p.status & STATUS_IMU_OK))  Serial.println("# [ALERTA] IMU BNO055 com falha");
-  if (p.status & STATUS_FLASH_CHEIA) Serial.println("# [ALERTA] flash W25Q128 cheia, gravacao parada");
-  else if (!(p.status & STATUS_FLASH_OK)) Serial.println("# [ALERTA] foguete NAO esta gravando na flash");
   if (bateria < BATERIA_BAIXA_V) Serial.printf("# [ALERTA] bateria baixa: %.2f V\n", bateria);
 }

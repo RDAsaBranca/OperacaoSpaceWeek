@@ -1,32 +1,34 @@
 // pinos.h - mapa de pinos e opcoes de hardware da ESP32-C3 SuperMini (foguete)
+// Segue o esquematico hardware/backup_projetos/Projeto_V1_7.epro2 (PCB V1.7).
+// O nome entre parenteses e o nome da net no esquematico.
 #pragma once
 
-// ---- Barramento SPI compartilhado: LoRa SX1276 + flash W25Q128 ----
-#define PIN_SPI_SCK     4
-#define PIN_SPI_MISO    5
-#define PIN_SPI_MOSI    6
+// ---- SPI: LoRa SX1276 ----
+#define PIN_SPI_SCK     4   // (SCK)
+#define PIN_SPI_MISO    5   // (MISO)
+#define PIN_SPI_MOSI    6   // (MOSI)
 
 // LoRa SX1276
-#define PIN_LORA_NSS    7
-#define PIN_LORA_RST    10
-#define PIN_LORA_DIO0   3
+#define PIN_LORA_NSS    3   // (CS2)   CS do radio
+#define PIN_LORA_RST    2   // (RESET) GPIO2 e pino de strapping, ver nota no fim (sem problema)
+#define PIN_LORA_DIO0   0   // (INTER) interrupcao de fim de transmissao
 
-// Flash W25Q128 (16 MB). /WP e /HOLD do chip devem ir em 3,3 V.
-#define PIN_FLASH_CS    0
+// GPIO7 (net CS1) vai para o CS da flash W25Q128 na PCB, mas a flash nao e
+// usada (o CanSat nao e recuperado) e nao e soldada. O firmware nao mexe nele.
 
 // ---- I2C: barometro BMP280 + IMU BNO055 ----
-#define PIN_I2C_SDA     8   // tambem e o LED azul da placa (ele pisca com o I2C, normal)
-#define PIN_I2C_SCL     9   // tambem e o botao BOOT (nao aperte com o foguete ligado)
+#define PIN_I2C_SDA     8   // (SDA) tambem e o LED azul da placa (ele pisca com o I2C, normal)
+#define PIN_I2C_SCL     9   // (SCL) tambem e o botao BOOT (nao aperte com o foguete ligado)
 #define I2C_FREQ_HZ     100000  // o BNO055 usa clock stretching: 100 kHz e o mais seguro
 
 // ---- GPS ATGM336H-5N-31 (UART1, NMEA a 9600 baud por padrao) ----
-#define PIN_GPS_RX      20  // ligar no TX do GPS
-#define PIN_GPS_TX      21  // ligar no RX do GPS
+#define PIN_GPS_RX      10  // (ESP_RX) ligado no TX do GPS
+#define PIN_GPS_TX      20  // (ESP_TX) ligado no RX do GPS
 #define GPS_BAUD        9600
 
 // ---- Bateria NCR18650B (Li-ion 1S: 4,2 V cheia, ~3,0 V vazia) ----
 // Divisor 100k/100k entre o B+ da celula e o GND: 4,2 V vira 2,1 V no pino.
-#define PIN_VBAT            1
+#define PIN_VBAT            1   // (V_Bat) ADC1 canal 1
 #define VBAT_FATOR_DIVISOR  2.0f
 
 // ---- Modo do BNO055 ----
@@ -38,5 +40,8 @@
 #define IMU_MODO_ALTO_G 0
 #endif
 
-// GPIO2 esta livre. Ele e pino de "strapping": nao ligue nada que o puxe
-// para GND durante o boot.
+// GPIO2, GPIO8 e GPIO9 sao pinos de "strapping", lidos no instante do reset.
+// GPIO9 em nivel alto = boot normal; o pull-up do I2C garante isso (e o
+// botao BOOT o puxa para GND). GPIO2 no RESET do SX1276 nao atrapalha: pelo
+// datasheet da C3 (v2.4, tabela 3-3, nota 2) ele nao define o modo de boot,
+// a Espressif so recomenda um pull-up contra ruido.

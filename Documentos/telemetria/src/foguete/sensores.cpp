@@ -21,6 +21,7 @@ static HardwareSerial& gpsSerial = Serial1;
 static bool     baroOk = false;
 static uint8_t  enderecoBmp = 0, chipIdBmp = 0;
 static uint32_t ultimoByteGpsMs = 0;
+static uint32_t ultimoAdcMv = 0;   // tensao lida no pino, antes do divisor
 
 static const float G_PADRAO = 9.80665f;
 
@@ -93,14 +94,25 @@ void sensoresIniciar() {
   Wire.setClock(I2C_FREQ_HZ);
 
   baroOk = iniciarBmp();
-  LOG("[SENS] BMP280:  %s\n", baroOk ? "ok" : "NAO ENCONTRADO");
+  if (baroOk) {
+    LOG("[BMP280] ok: encontrado no endereco 0x%02X (chip 0x%02X)\n", enderecoBmp, chipIdBmp);
+  } else {
+    LOG("[BMP280] FALHA: nao respondeu em 0x76 nem 0x77 (confira SDA=GPIO%d, SCL=GPIO%d e 3V3)\n",
+        PIN_I2C_SDA, PIN_I2C_SCL);
+  }
 
   bool imuOk = iniciarBno();
-  LOG("[SENS] BNO055:  %s\n", imuOk ? (IMU_MODO_ALTO_G ? "ok (AMG +-16 g)" : "ok (fusao NDOF)")
-                                    : "NAO ENCONTRADO");
+  if (imuOk) {
+    LOG("[BNO055] ok: encontrado no endereco 0x%02X, %s\n", enderecoBno,
+        IMU_MODO_ALTO_G ? "modo AMG +-16 g" : "modo fusao NDOF");
+  } else {
+    LOG("[BNO055] FALHA: nao respondeu em 0x28 nem 0x29 (confira SDA=GPIO%d, SCL=GPIO%d e 3V3)\n",
+        PIN_I2C_SDA, PIN_I2C_SCL);
+  }
 
   gpsSerial.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
-  LOG("[SENS] GPS ATGM336H na UART1 a %d baud\n", GPS_BAUD);
+  LOG("[GPS]    UART1 a %d baud (TX do GPS -> GPIO%d). Se ele esta enviando, aparece no diagnostico\n",
+      GPS_BAUD, PIN_GPS_RX);
 }
 
 void sensoresAtualizarGps() {
@@ -158,7 +170,8 @@ void sensoresLer(LeituraSensores& l) {
   if (gps.altitude.isValid()) l.altitudeGpsM = gps.altitude.meters();
   l.satelites = gps.satellites.isValid() ? (uint8_t)gps.satellites.value() : 0;
 
-  l.bateriaMv = (uint16_t)(analogReadMilliVolts(PIN_VBAT) * VBAT_FATOR_DIVISOR);
+  ultimoAdcMv = analogReadMilliVolts(PIN_VBAT);
+  l.bateriaMv = (uint16_t)(ultimoAdcMv * VBAT_FATOR_DIVISOR);
 }
 
 float sensoresPressaoMedia(uint16_t amostras) {
@@ -184,4 +197,63 @@ void sensoresImprimirResumo(Print& s) {
            (millis() - ultimoByteGpsMs < 2000) ? "recebendo" : "SEM DADOS",
            (unsigned long)gps.charsProcessed(),
            gps.satellites.isValid() ? (unsigned)gps.satellites.value() : 0u);
+}
+
+void sensoresImprimirDiagnostico(const LeituraSensores& l, Print& s) {
+  // ---- BMP280 ----
+  if (!baroOk) {
+    s.println("[BMP280] FALHA: nao encontrado na inicializacao (aperte RESET depois de ligar)");
+  } else if (!(l.status & STATUS_BARO_OK)) {
+    s.printf("[BMP280] FALHA: leitura invalida (%.0f Pa), I2C com problema?\n", l.pressaoPa);
+  } else {
+    s.printf("[BMP280] ok    | %.0f Pa | %.2f C\n", l.pressaoPa, l.temperaturaC);
+  }
+
+  // ---- BNO055 ----
+  if (!bno) {
+    s.println("[BNO055] FALHA: nao encontrado na inicializacao (aperte RESET depois de ligar)");
+  } else if (!(l.status & STATUS_IMU_OK)) {
+    s.println("[BNO055] FALHA: leitura zerada, I2C com problema?");
+  } else {
+    s.printf("[BNO055] ok    | acel %+.2f %+.2f %+.2f g | giro %+.1f %+.1f %+.1f graus/s",
+             l.acelG[0], l.acelG[1], l.acelG[2], l.giroDps[0], l.giroDps[1], l.giroDps[2]);
+#if !IMU_MODO_ALTO_G
+    const unsigned c = l.calibracao;
+    if (l.status & STATUS_ORIENT_OK) {
+      s.printf(" | quat %+.3f %+.3f %+.3f %+.3f", l.quat[0], l.quat[1], l.quat[2], l.quat[3]);
+    } else {
+      s.print(" | sem orientacao");
+    }
+    s.printf(" | cal S%u G%u A%u M%u", (c >> 6) & 3u, (c >> 4) & 3u, (c >> 2) & 3u, c & 3u);
+#endif
+    s.println();
+  }
+
+  // ---- GPS ----
+  const unsigned long frasesOk = gps.passedChecksum(), frasesErro = gps.failedChecksum();
+  if (!(l.status & STATUS_GPS_OK)) {
+    if (gps.charsProcessed() == 0) {
+      s.printf("[GPS]    FALHA: nenhum byte recebido (TX do GPS -> GPIO%d? alimentacao?)\n", PIN_GPS_RX);
+    } else {
+      s.println("[GPS]    FALHA: parou de enviar dados ha mais de 2 s");
+    }
+  } else if (frasesOk == 0) {
+    s.printf("[GPS]    AVISO: chegam bytes, mas nenhuma frase NMEA valida (%lu com erro). Baud errado?\n",
+             frasesErro);
+  } else {
+    s.printf("[GPS]    ok    | %lu frases validas, %lu com erro | %u satelites", frasesOk, frasesErro,
+             (unsigned)l.satelites);
+    if (l.status & STATUS_GPS_FIX) {
+      s.printf(" | posicao %.7f, %.7f | alt %.0f m", l.latitude, l.longitude, l.altitudeGpsM);
+    } else {
+      s.print(" | sem posicao ainda (precisa de ceu aberto; leva de 30 s a alguns minutos)");
+    }
+    s.println();
+  }
+
+  // ---- Bateria (ADC) ----
+  const float v = l.bateriaMv / 1000.0f;
+  s.printf("[BAT]    %.2f V (pino GPIO%d: %lu mV)", v, PIN_VBAT, (unsigned long)ultimoAdcMv);
+  if (v < 2.5f || v > 4.5f) s.print(" | AVISO: fora da faixa de uma celula Li-ion (bateria e divisor ligados?)");
+  s.println();
 }

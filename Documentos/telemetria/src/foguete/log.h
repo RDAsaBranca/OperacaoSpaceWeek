@@ -2,11 +2,11 @@
 #pragma once
 #include <Arduino.h>
 
-#ifndef DEBUG_SERIAL
-#define DEBUG_SERIAL 1
+#ifndef DIAGNOSTICO_USB
+#define DIAGNOSTICO_USB 1
 #endif
 
-#if DEBUG_SERIAL
+#if DIAGNOSTICO_USB
   #define LOG(...) Serial.printf(__VA_ARGS__)
 #else
   // Desligado: o compilador descarta a chamada, mas continua conferindo o formato
