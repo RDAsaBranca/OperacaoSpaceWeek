@@ -2,6 +2,8 @@
 #include <SPI.h>
 #include <RadioLib.h>
 #include "ConfigLoRa.h"
+#include "Protocolo.h"
+#include "QuadroReyax.h"
 #include "pinos.h"
 #include "log.h"
 
@@ -39,7 +41,12 @@ bool radioIniciar() {
     return false;
   }
   radio.setCurrentLimit(LORA_LIMITE_CORRENTE_MA);  // o begin() deixa em 60 mA
-  radio.setCRC(true);
+  // Camada fisica que o RYLR998 espera (docs/arquitetura_enlace_reyax.md,
+  // secao 2). Sao os padroes do RadioLib, mas ficam explicitos de proposito.
+  radio.explicitHeader();   // header explicito: len, CR e flag de CRC vao no ar
+  radio.setCRC(true);       // CRC16 de hardware no fim do payload
+  radio.invertIQ(false);    // IQ normal
+  radio.autoLDRO();         // SF7/125 kHz: simbolo de 1,024 ms -> LDRO desligado
   radio.setPacketSentAction(aoTerminarTx);
   txEmAndamento = false;
   txTerminou = false;
@@ -88,6 +95,24 @@ void radioAtualizar() {
 
 uint32_t radioTempoNoArUs(size_t len) {
   return pronto ? (uint32_t)radio.getTimeOnAir(len) : 0;
+}
+
+void radioImprimirParametros(Print& s) {
+  s.printf("[LoRa]   enlace %.1f MHz | SF%d | BW %.0f kHz | CR 4/%d | sync 0x%02X (AT+NETWORKID=%d)"
+           " | preambulo %d | header explicito, CRC, IQ normal\n",
+           LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, LORA_CR, LORA_SYNC_WORD, LORA_SYNC_WORD,
+           LORA_PREAMBULO);
+  s.printf("[LoRa]   quadro %u B = cabecalho Reyax %u B (dst %u, src %u) + %s %u B"
+           " (PacoteTelemetria v%d, %u B)\n",
+           (unsigned)TLM_QUADRO_TAM, (unsigned)RYLR_CAB_TAM, (unsigned)RYLR_END_DESTINO,
+           (unsigned)RYLR_END_CANSAT, TLM_CODIFICACAO == TLM_COD_BINARIO ? "binario" : "Base64",
+           (unsigned)TLM_PAYLOAD_TAM, TLM_VERSAO, (unsigned)sizeof(PacoteTelemetria));
+  if (!pronto) return;  // o tempo no ar so sai com o SX1276 configurado
+  const uint32_t toaUs = radioTempoNoArUs(TLM_QUADRO_TAM);
+  s.printf("[LoRa]   tempo no ar %.1f ms | periodo %d ms%s\n", toaUs / 1000.0f, TLM_PERIODO_MS,
+           toaUs / 1000 >= TLM_PERIODO_MS
+               ? " | AVISO: tempo no ar >= periodo. Aumente TLM_PERIODO_MS ou reduza o SF"
+               : "");
 }
 
 void radioImprimirDiagnostico(Print& s) {

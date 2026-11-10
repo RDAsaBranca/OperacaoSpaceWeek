@@ -76,14 +76,14 @@ static void rotaDashboard() {
 }
 
 static void rotaInfo() {
-  char buf[720];
+  char buf[760];
   snprintf(buf, sizeof(buf),
            "{\"colunas\":\"%s,rssi_dbm,snr_db\",\"versao\":%d,\"periodo_ms\":%d,"
            "\"timeout_ms\":%d,\"freq_mhz\":%.1f,\"sf\":%d,\"bw_khz\":%.0f,"
-           "\"simulacao\":%s,\"rede\":\"%s\"}",
+           "\"receptor\":\"%s\",\"simulacao\":%s,\"rede\":\"%s\"}",
            TLM_COLUNAS, TLM_VERSAO, TLM_PERIODO_MS, TLM_TIMEOUT_SINAL_MS,
-           LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, SIMULAR_FOGUETE ? "true" : "false",
-           WIFI_NOME);
+           LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, RECEPTOR_NOME,
+           SIMULAR_FOGUETE ? "true" : "false", WIFI_NOME);
   responderJson(200, String(buf));
 }
 

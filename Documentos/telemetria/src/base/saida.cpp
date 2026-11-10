@@ -1,11 +1,19 @@
 #include "saida.h"
 #include <Arduino.h>
 #include <math.h>
+#include "ConfigLoRa.h"
+#include "QuadroReyax.h"
+#include "config_base.h"
+#include "pinos.h"
 
 static const float BATERIA_BAIXA_V = 3.5f;  // NCR18650B: ~3,6 V nominal, 4,2 V cheia
 
 void saidaCabecalho() {
-  Serial.println("# === ESTACAO BASE: telemetria LoRa SX1276 ===");
+  Serial.println("# === ESTACAO BASE: telemetria LoRa, receptor " RECEPTOR_NOME
+                 " (" PLACA_NOME ") ===");
+  Serial.printf("# enlace: %.1f MHz SF%d BW%.0f CR4/%d sync 0x%02X preambulo %d | foguete = endereco %u\n",
+                LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, LORA_CR, LORA_SYNC_WORD, LORA_PREAMBULO,
+                (unsigned)RYLR_END_CANSAT);
   Serial.printf("# colunas TLM: %s,rssi_dbm,snr_db,perdidos\n", TLM_COLUNAS);
 }
 

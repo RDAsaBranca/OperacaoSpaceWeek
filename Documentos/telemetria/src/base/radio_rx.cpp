@@ -1,3 +1,6 @@
+#include "config_base.h"
+#if RECEPTOR_BASE == RECEPTOR_SX1276
+
 #include "radio_rx.h"
 #include <SPI.h>
 #include <RadioLib.h>
@@ -8,7 +11,7 @@ static SX1276 radio = new Module(PIN_LORA_NSS, PIN_LORA_DIO0, PIN_LORA_RST, RADI
 
 static volatile bool pacoteChegou = false;
 
-// Interrupcao do DIO0: so marca a flag, a leitura e feita no loop
+// Interrupcao do DIO0: so marca a flag, a leitura e feita na tarefa
 static void IRAM_ATTR aoReceber() {
   pacoteChegou = true;
 }
@@ -19,16 +22,20 @@ bool radioIniciar() {
   int16_t st = radio.begin(LORA_FREQ_MHZ, LORA_BW_KHZ, LORA_SF, LORA_CR,
                            LORA_SYNC_WORD, LORA_POTENCIA_DBM, LORA_PREAMBULO);
   if (st != RADIOLIB_ERR_NONE) {
-    Serial.printf("# [RADIO] begin() falhou, codigo %d (confira fiacao e alimentacao)\n", st);
+    Serial.printf("# [SX1276] begin() falhou, codigo %d (confira fiacao e alimentacao)\n", st);
     return false;
   }
   radio.setCurrentLimit(LORA_LIMITE_CORRENTE_MA);
-  radio.setCRC(true);
+  // Mesma camada fisica do foguete e do RYLR998 (docs/arquitetura_enlace_reyax.md, secao 2)
+  radio.explicitHeader();
+  radio.setCRC(true);     // quadro sem CRC no header LoRa -> RADIOLIB_ERR_LORA_HEADER_DAMAGED
+  radio.invertIQ(false);
+  radio.autoLDRO();
   radio.setPacketReceivedAction(aoReceber);
 
   st = radio.startReceive();
   if (st != RADIOLIB_ERR_NONE) {
-    Serial.printf("# [RADIO] startReceive() falhou, codigo %d\n", st);
+    Serial.printf("# [SX1276] startReceive() falhou, codigo %d\n", st);
     return false;
   }
   return true;
@@ -40,7 +47,7 @@ ResultadoRx radioLer(uint8_t* buf, size_t maximo, size_t& len, float& rssi, floa
 
   len = radio.getPacketLength();
   if (len > maximo) len = maximo;
-  int16_t st = radio.readData(buf, len);
+  const int16_t st = radio.readData(buf, len);
   rssi = radio.getRSSI();
   snr  = radio.getSNR();
 
@@ -50,3 +57,5 @@ ResultadoRx radioLer(uint8_t* buf, size_t maximo, size_t& len, float& rssi, floa
   if (st == RADIOLIB_ERR_CRC_MISMATCH) return RX_ERRO_CRC;
   return RX_ERRO;
 }
+
+#endif  // RECEPTOR_BASE == RECEPTOR_SX1276

@@ -2,7 +2,7 @@
 
 Projeto PlatformIO separado para validar, em bancada, o enlace descrito em `../docs/arquitetura_enlace_reyax.md`. Um único quadro transmitido pelo SX1276 do CanSat é recebido ao mesmo tempo por dois rádios na base: um SX1276 e um REYAX RYLR998.
 
-Os firmwares de voo (`../src/foguete` e `../src/base`) não são usados nem alterados aqui. O formato do pacote, porém, é o mesmo do CanSat real: o projeto compila o `../lib/Telemetria/Protocolo.h` (64 bytes, versão 3, com magnetômetro).
+Os firmwares de voo (`../src/foguete` e `../src/base`) não são usados nem alterados aqui. O formato do pacote e do quadro, porém, é o mesmo do CanSat real: o projeto compila o `../lib/Telemetria/Protocolo.h` (64 bytes, versão 3, com magnetômetro) e o `../lib/Telemetria/QuadroReyax.*`.
 
 | Ambiente | Código | Placa | O que faz |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Os firmwares de voo (`../src/foguete` e `../src/base`) não são usados nem alte
 
 Parâmetros de rádio, iguais nos três rádios (`lib/Enlace/ConfigEnlace.h`): 915,2 MHz, SF7, 125 kHz, CR 4/5, sync word 0x12 (`AT+NETWORKID=18`), preâmbulo 12, header explícito, CRC ligado, IQ normal.
 
-**Atenção:** esses parâmetros são diferentes dos firmwares de voo atuais (915,0 MHz, sync 0x2B, preâmbulo 8). O CanSat real não fala com a `base_dupla`, e o `cansat_sim` não fala com a base de voo, até a integração ser feita.
+**Integração com o voo:** o firmware do foguete (`../src/foguete`) já usa estes parâmetros (`../lib/Telemetria/ConfigLoRa.h`) e transmite o mesmo quadro, com os dados reais dos sensores. Basta gravar `pio run -e foguete -t upload` no projeto principal no lugar do `cansat_sim` para a `base_dupla` receber o CanSat de verdade. A base de voo (`../src/base`) ainda não decodifica o quadro: não fala nem com o `cansat_sim` nem com o foguete até o passo 3 da §11.7 do documento.
 
 ## Ligações da base (`base_dupla`)
 
@@ -35,8 +35,9 @@ Parâmetros de rádio, iguais nos três rádios (`lib/Enlace/ConfigEnlace.h`): 9
 | SX1276 | RESET / DIO0 | 14 / 26 |
 | RYLR998 | TXD (pino 4) | 16 (RX2) |
 | RYLR998 | RXD (pino 3) | 17 (TX2) |
-| RYLR998 | NRST (pino 2) | 4 (opcional) |
 | RYLR998 | VDD / GND | 3V3 / GND |
+
+O NRST (pino 2) do RYLR998 não é usado: fica desligado da ESP32. Ao iniciar, a base insiste no `AT` por até ~2 s, esperando o módulo terminar de ligar.
 
 O RYLR998 é de 3,3 V (alimentação e níveis lógicos). Numa ESP32 WROVER os GPIO16/17 são da PSRAM: troque em `src/base_dupla/pinos.h`.
 
@@ -78,8 +79,8 @@ Se o RYLR998 não responder, a base segue só com o SX1276, e vice-versa. O dash
 teste_enlace/
 ├── platformio.ini
 ├── lib/Enlace/
-│   ├── ConfigEnlace.h      parâmetros de rádio compatíveis com o RYLR998
-│   └── QuadroReyax.*       cabeçalho Reyax, Base64, codifica/decodifica a telemetria
+│   └── ConfigEnlace.h      parâmetros de rádio compatíveis com o RYLR998 (iguais ao ../lib/Telemetria/ConfigLoRa.h)
+│   (QuadroReyax.* fica em ../lib/Telemetria, compartilhado com o foguete: cabeçalho Reyax, Base64, telemetria)
 ├── src/cansat_sim/         Código 1: main, simulacao (voo fictício), radio_tx, pinos
 ├── src/base_dupla/         Código 2: recepcao (dois rádios), reyax_rx (AT + parser +RCV),
 │                           fusao, radio_rx, servidor_web, gravacao, saida, pinos

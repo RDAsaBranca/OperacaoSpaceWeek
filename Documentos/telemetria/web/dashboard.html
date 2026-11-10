@@ -610,7 +610,7 @@ function atualizarAlertas() {
   if (conectado === false) {
     lista.push(['', 'Sem conexão com a estação base. Confira se este aparelho está na rede ' + (info ? info.rede : 'da base') + '.']);
   } else if (status) {
-    if (!status.radio_ok) lista.push(['', 'O rádio LoRa da base não respondeu. Confira a fiação e a alimentação do SX1276.']);
+    if (!status.radio_ok) lista.push(['', 'O rádio LoRa da base não respondeu. Confira a fiação e a alimentação do ' + (info.receptor || 'SX1276') + '.']);
     const s = semSinalMs();
     if (s > info.timeout_ms && atual) {
       lista.push(['', 'Sem sinal do foguete há ' + Math.floor(s / 1000) + ' s. Última posição: ' +
@@ -961,7 +961,8 @@ async function iniciar() {
   }
   fetch('/api/hora?epoch_ms=' + Date.now(), { method: 'POST' }).catch(() => {});
   $('#simulacao').hidden = !info.simulacao;
-  texto('#escuta', 'A base escuta em ' + fmt(info.freq_mhz, 1) + ' MHz, SF' + info.sf + '.');
+  texto('#escuta', 'A base escuta em ' + fmt(info.freq_mhz, 1) + ' MHz, SF' + info.sf +
+        (info.receptor ? ', com o ' + info.receptor : '') + '.');
   setInterval(() => { atualizarEnlace(); atualizarSinal(); atualizarAlertas(); }, 1000);
   ciclo();
 }

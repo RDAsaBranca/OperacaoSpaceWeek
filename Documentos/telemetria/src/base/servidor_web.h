@@ -2,7 +2,7 @@
 //
 // Rotas:
 //   GET  /                        dashboard (pagina unica, guardada comprimida)
-//   GET  /api/info                colunas, parametros do radio, modo simulacao
+//   GET  /api/info                colunas, parametros do radio, receptor, modo simulacao
 //   GET  /api/dados?desde=N       pacotes novos depois do indice N + estatisticas
 //   POST /api/hora?epoch_ms=T     acerta o relogio da base (o dashboard faz sozinho)
 //   POST /api/gravacao/iniciar    comeca a gravar na memoria da base

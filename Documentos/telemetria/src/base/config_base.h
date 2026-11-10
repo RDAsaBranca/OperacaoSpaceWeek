@@ -1,6 +1,26 @@
 // config_base.h - configuracoes da estacao base
 #pragma once
 
+// ---- Receptor: a base tem UM modulo LoRa, escolhido na compilacao ----
+// O ambiente do platformio.ini define RECEPTOR_BASE:
+//   pio run -e base        -> SX1276 no SPI (tira o cabecalho Reyax no firmware)
+//   pio run -e base_reyax  -> REYAX RYLR998 na UART (o modulo tira o cabecalho)
+//   pio run -e base_heltec -> SX1276 da Heltec WiFi LoRa 32 V2 (pinos em pinos.h)
+// Os dois recebem o mesmo quadro do foguete (lib/Telemetria/QuadroReyax.h).
+// Para ouvir com os dois ao mesmo tempo, use a base_dupla do teste_enlace/.
+#define RECEPTOR_SX1276   1
+#define RECEPTOR_RYLR998  2
+#ifndef RECEPTOR_BASE
+#define RECEPTOR_BASE RECEPTOR_SX1276
+#endif
+#if RECEPTOR_BASE == RECEPTOR_SX1276
+#define RECEPTOR_NOME "SX1276"
+#elif RECEPTOR_BASE == RECEPTOR_RYLR998
+#define RECEPTOR_NOME "RYLR998"
+#else
+#error "RECEPTOR_BASE precisa ser RECEPTOR_SX1276 ou RECEPTOR_RYLR998"
+#endif
+
 // ---- Wi-Fi: a base cria a propria rede (nao precisa de internet) ----
 // Conecte o celular/notebook nesta rede e abra http://192.168.4.1
 #define WIFI_NOME          "EstacaoBase-Foguete"

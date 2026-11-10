@@ -18,6 +18,7 @@ static void info() {
   sensoresImprimirResumo(Serial);
   Serial.print("# ");
   radioImprimirDiagnostico(Serial);
+  radioImprimirParametros(Serial);
 }
 
 static void executar(const char* cmd) {

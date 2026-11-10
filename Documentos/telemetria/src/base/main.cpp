@@ -1,8 +1,16 @@
 // ============================================================
-//  ESTACAO BASE - ESP32 + SX1276
+//  ESTACAO BASE - ESP32 + um receptor LoRa: SX1276 OU REYAX RYLR998
+//
+//  O receptor e escolhido pelo ambiente (config_base.h, RECEPTOR_BASE):
+//    pio run -e base        -> SX1276 (SPI): recebe o quadro inteiro e
+//                              tira o cabecalho Reyax no firmware
+//    pio run -e base_reyax  -> RYLR998 (UART): o modulo tira o cabecalho
+//                              e entrega +RCV
+//  Os dois saem com o mesmo formato (USB, dashboard, gravacao). Para ouvir
+//  com os dois ao mesmo tempo, use a base_dupla do teste_enlace/.
 //
 //  Duas tarefas em paralelo:
-//   - recepcao (prioridade alta): le o radio, valida, conta perdas
+//   - recepcao (prioridade alta): le o receptor, valida, conta perdas
 //   - loop() (prioridade normal): rede Wi-Fi propria, dashboard,
 //     historico e gravacao sob demanda na memoria interna
 //
@@ -29,10 +37,10 @@ void setup() {
   fila = xQueueCreate(FILA_TAM, sizeof(ItemRecebido));
 
 #if SIMULAR_FOGUETE
-  Serial.println("# [BASE] MODO SIMULACAO: voo ficticio, radio desligado");
+  Serial.println("# [BASE] MODO SIMULACAO: voo ficticio, receptor desligado");
 #endif
-  webIniciar(fila);        // o dashboard abre mesmo se o radio falhar
-  recepcaoIniciar(fila);   // a tarefa inicia o radio e tenta de novo se precisar
+  webIniciar(fila);        // o dashboard abre mesmo se o receptor falhar
+  recepcaoIniciar(fila);   // a tarefa inicia o receptor e tenta de novo se precisar
 }
 
 void loop() {

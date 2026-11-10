@@ -2,14 +2,16 @@
 #include <math.h>
 #include <string.h>
 #include "ConfigLoRa.h"
+#include "QuadroReyax.h"
 #include "config_base.h"
 #include "pinos.h"
 #include "radio_rx.h"
 #include "saida.h"
 
-static const uint32_t PERIODO_LEGIVEL_MS = 1000;
-static const uint32_t PERIODO_ESPERA_MS  = 5000;
-static const uint32_t LED_ACESO_MS       = 30;
+static const uint32_t PERIODO_LEGIVEL_MS   = 1000;
+static const uint32_t PERIODO_ESPERA_MS    = 5000;
+static const uint32_t LED_ACESO_MS         = 30;
+static const uint32_t RETENTAR_RECEPTOR_MS = 2000;
 
 static QueueHandle_t   filaSaida = nullptr;
 static portMUX_TYPE    trava = portMUX_INITIALIZER_UNLOCKED;
@@ -28,6 +30,8 @@ EstatisticasRx recepcaoEstatisticas() {
   portEXIT_CRITICAL(&trava);
   return copia;
 }
+
+#define CONTAR(campo) do { portENTER_CRITICAL(&trava); est.campo++; portEXIT_CRITICAL(&trava); } while (0)
 
 // Conta perdas pelos saltos na sequencia. Retorna true se o foguete reiniciou.
 static bool contarSequencia(uint16_t seq) {
@@ -148,6 +152,70 @@ static void simularPacote(PacoteTelemetria& p, uint16_t seq, float& rssi, float&
   rssi = -45.0f - 20.0f * log10f(dist);
   snr  = 9.5f - (dist / 120.0f);
 }
+
+#elif RECEPTOR_BASE == RECEPTOR_SX1276
+// ------------------------------------------------------------------
+// SX1276: recebe o quadro INTEIRO do foguete e tira o cabecalho Reyax aqui.
+// ------------------------------------------------------------------
+static bool iniciarReceptor() {
+  return radioIniciar();
+}
+
+static void lerReceptor() {
+  uint8_t buf[RYLR_QUADRO_MAX];  // o quadro Base64 tem 93 bytes (binario: 69)
+  size_t  len = 0;
+  float   rssi = 0, snr = 0;
+  switch (radioLer(buf, sizeof(buf), len, rssi, snr)) {
+    case RX_OK: {
+      CabecalhoRylr    cab;
+      const uint8_t*   payload = nullptr;
+      PacoteTelemetria p;
+      // 1) cabecalho: len >= 5 e byte 4 == len - 5   2) origem = foguete
+      // 3) bytes 5..: Base64 (ou binario) -> PacoteTelemetria -> magic, versao, CRC16
+      if (rylrAbrir(buf, len, cab, payload) && cab.src == RYLR_END_CANSAT &&
+          tlmDecodificar(payload, cab.len, p)) {
+        processarValido(p, rssi, snr);
+      } else {
+        CONTAR(invalidos);
+        Serial.printf("# [SX1276] quadro invalido ou de outra rede (%u bytes, RSSI %.0f dBm)\n",
+                      (unsigned)len, rssi);
+      }
+      break;
+    }
+    case RX_ERRO_CRC: CONTAR(errosCrc);   break;
+    case RX_ERRO:     CONTAR(errosRadio); break;
+    case RX_NADA:     break;
+  }
+}
+
+#else  // RECEPTOR_BASE == RECEPTOR_RYLR998
+// ------------------------------------------------------------------
+// RYLR998: o proprio modulo confere e tira o cabecalho, e entrega +RCV.
+// ------------------------------------------------------------------
+static bool iniciarReceptor() {
+  return reyaxIniciar();
+}
+
+static void lerReceptor() {
+  uint16_t origem;
+  uint8_t  payload[RYLR_PAYLOAD_MAX];
+  size_t   len;
+  int      rssi, snr;
+  while (reyaxLer(origem, payload, sizeof(payload), len, rssi, snr)) {
+    PacoteTelemetria p;
+    if (origem == RYLR_END_CANSAT && tlmDecodificar(payload, len, p)) {
+      processarValido(p, (float)rssi, (float)snr);
+    } else {
+      CONTAR(invalidos);
+      Serial.printf("# [REYAX] +RCV invalido (origem %u, %u bytes, RSSI %d dBm)\n",
+                    (unsigned)origem, (unsigned)len, rssi);
+    }
+  }
+  const EstatisticasReyax er = reyaxEstatisticas();
+  portENTER_CRITICAL(&trava);
+  est.reyax = er;
+  portEXIT_CRITICAL(&trava);
+}
 #endif
 
 static void tarefaRecepcao(void*) {
@@ -158,15 +226,15 @@ static void tarefaRecepcao(void*) {
   uint32_t tSim = 0;
   uint16_t seqSim = 0;
 #else
-  while (!radioIniciar()) {
-    Serial.println("# [RADIO] tentando de novo em 2 s...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+  while (!iniciarReceptor()) {
+    Serial.println("# [" RECEPTOR_NOME "] tentando de novo em 2 s...");
+    vTaskDelay(pdMS_TO_TICKS(RETENTAR_RECEPTOR_MS));
   }
   portENTER_CRITICAL(&trava);
   est.radioOk = true;
   portEXIT_CRITICAL(&trava);
-  Serial.printf("# [RADIO] escutando em %.1f MHz SF%d BW%.0f kHz\n",
-                LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ);
+  Serial.printf("# [" RECEPTOR_NOME "] escutando em %.1f MHz SF%d BW%.0f kHz sync 0x%02X preambulo %d\n",
+                LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, LORA_SYNC_WORD, LORA_PREAMBULO);
 #endif
 
   for (;;) {
@@ -181,34 +249,7 @@ static void tarefaRecepcao(void*) {
       if (random(100) >= 3) processarValido(p, rssi, snr);  // ~3% de perda ficticia
     }
 #else
-    uint8_t buf[64];
-    size_t  len = 0;
-    float   rssi = 0, snr = 0;
-    switch (radioLer(buf, sizeof(buf), len, rssi, snr)) {
-      case RX_OK: {
-        PacoteTelemetria p;
-        if (pacoteValidar(buf, len, p)) {
-          processarValido(p, rssi, snr);
-        } else {
-          portENTER_CRITICAL(&trava);
-          est.invalidos++;
-          portEXIT_CRITICAL(&trava);
-          Serial.printf("# [BASE] pacote invalido ou de outra rede (%u bytes, RSSI %.0f dBm)\n",
-                        (unsigned)len, rssi);
-        }
-        break;
-      }
-      case RX_ERRO_CRC:
-        portENTER_CRITICAL(&trava);
-        est.errosCrc++;
-        portEXIT_CRITICAL(&trava);
-        break;
-      case RX_ERRO:
-        Serial.println("# [BASE] erro de leitura no radio");
-        break;
-      case RX_NADA:
-        break;
-    }
+    lerReceptor();
 #endif
 
     if (ledAceso && agora - tLed >= LED_ACESO_MS) {
@@ -230,11 +271,19 @@ static void tarefaRecepcao(void*) {
     }
     if (!e.temPacote && agora - tEspera >= PERIODO_ESPERA_MS) {
       tEspera = agora;
-      Serial.printf("# [BASE] aguardando o foguete... (erros CRC %lu, invalidos %lu)\n",
-                    (unsigned long)e.errosCrc, (unsigned long)e.invalidos);
+#if RECEPTOR_BASE == RECEPTOR_SX1276
+      Serial.printf("# [BASE] aguardando o foguete... SX1276 (erros CRC %lu, outros erros %lu,"
+                    " invalidos %lu)\n", (unsigned long)e.errosCrc, (unsigned long)e.errosRadio,
+                    (unsigned long)e.invalidos);
+#else
+      Serial.printf("# [BASE] aguardando o foguete... RYLR998 (+RCV %lu, invalidos %lu,"
+                    " linhas ruins %lu, +ERR %lu %s)\n", (unsigned long)e.reyax.linhasRcv,
+                    (unsigned long)e.invalidos, (unsigned long)e.reyax.linhasRuins,
+                    (unsigned long)e.reyax.errosModulo, e.reyax.ultimoErro);
+#endif
     }
 
-    vTaskDelay(pdMS_TO_TICKS(2));  // libera a CPU; o SX1276 guarda o pacote ate ser lido
+    vTaskDelay(pdMS_TO_TICKS(2));  // libera a CPU; o SX1276 e a UART guardam os dados
   }
 }
 

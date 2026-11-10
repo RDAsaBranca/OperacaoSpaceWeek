@@ -15,6 +15,6 @@
 // sao da PSRAM: escolha outros pinos.
 #define PIN_REYAX_RX    16  // RX2 da ESP32 <- TXD do RYLR998 (pino 4)
 #define PIN_REYAX_TX    17  // TX2 da ESP32 -> RXD do RYLR998 (pino 3)
-#define PIN_REYAX_RST   4   // -> NRST do RYLR998 (pino 2). Opcional: apague se nao ligar
+// NRST do RYLR998 (pino 2) nao e usado: fica desligado da ESP32.
 
 #define PIN_LED         2   // LED azul da maioria dos DevKits: pisca a cada pacote

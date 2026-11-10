@@ -19,7 +19,7 @@
 #define PIN_SPI_SCK     4    // (SCK)
 #define PIN_SPI_MISO    5    // (MISO)
 #define PIN_SPI_MOSI    6    // (MOSI)
-#define PIN_LORA_NSS    3    // (CS2)
+#define PIN_LORA_NSS    7    // (CS1)
 #define PIN_LORA_RST    2    // (RESET)
 #define PIN_LORA_DIO0   0    // (INTER) fim de transmissao
 // Sem LED: na SuperMini o LED azul (GPIO8) e o SDA do I2C dos sensores.

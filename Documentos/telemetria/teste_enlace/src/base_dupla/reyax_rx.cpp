@@ -43,6 +43,7 @@ static bool atComando(const char* cmd, char* resp, size_t tam, uint32_t timeoutM
   char linha[64];
   while (lerLinha(linha, sizeof(linha), prazo)) {
     if (strncmp(linha, "+RCV=", 5) == 0) continue;
+    if (strcmp(linha, "+READY") == 0) continue;  // aviso de boot, nao e resposta
     if (linha[0] != '+') continue;
     strncpy(resp, linha, tam - 1);
     resp[tam - 1] = '\0';
@@ -50,6 +51,11 @@ static bool atComando(const char* cmd, char* resp, size_t tam, uint32_t timeoutM
   }
   resp[0] = '\0';
   return false;
+}
+
+// Descarta o que estiver parado na UART (+READY do boot, +RCV antigo, lixo).
+static void limparEntrada() {
+  while (uart.available()) uart.read();
 }
 
 static bool esperarLinha(const char* texto, uint32_t timeoutMs) {
@@ -95,16 +101,15 @@ bool reyaxIniciar() {
     uartIniciada = true;
   }
 
-#ifdef PIN_REYAX_RST
-  pinMode(PIN_REYAX_RST, OUTPUT);
-  digitalWrite(PIN_REYAX_RST, LOW);
-  delay(150);                       // datasheet: NRST em nivel baixo por >= 100 ms
-  digitalWrite(PIN_REYAX_RST, HIGH);
-  esperarLinha("+READY", 2000);
-#endif
-
+  // Sem o pino NRST: o modulo liga junto com a ESP32 e pode ainda estar
+  // inicializando. Insiste no AT por ate ~2 s antes de desistir.
   char resp[64];
-  if (!atComando("AT", resp, sizeof(resp))) {
+  bool respondeu = false;
+  for (int tentativa = 0; tentativa < 8 && !respondeu; tentativa++) {
+    limparEntrada();
+    respondeu = atComando("AT", resp, sizeof(resp), 250);
+  }
+  if (!respondeu) {
     Serial.println("# [REYAX] sem resposta ao AT (fiacao TX/RX cruzada? 3,3 V?)");
     return false;
   }

@@ -2054,6 +2054,10 @@ Quando os testes T1–T5 passarem com o `teste_enlace`:
 4. **`ferramentas/registrar_serial.py`:** acrescentar `receptores, rssi_sx_dbm, snr_sx_db, rssi_ry_dbm, snr_ry_db` às colunas.
 5. Regravar os dois lados e repetir o T5 com `foguete` e `base`.
 
+**Andamento (09/11/2026):** passos 1 e 2 feitos, depois de o `cansat_sim` chegar à `base_dupla` pelo RYLR998 em bancada. O `QuadroReyax.*` foi movido (não copiado) para `lib/Telemetria`, porque o `teste_enlace` também enxerga `../lib` e duas cópias dariam símbolos duplicados. O foguete passa a transmitir o quadro com os dados reais dos sensores, para a `base_dupla` (compilado; falta repetir o T5 em rádio com o `foguete` no lugar do `cansat_sim`). Faltam os passos 3 a 5: até lá, a base de voo não decodifica o foguete.
+
+**Passo 3, feito de outro jeito (09/11/2026):** a base de voo ficou com **um** receptor, escolhido na compilação (`RECEPTOR_BASE` em `src/base/config_base.h`): `[env:base]` usa o SX1276 e `[env:base_reyax]` usa o RYLR998. Sem fusão: `reyax_rx.*` foi copiado da `base_dupla`, o `radio_rx.cpp` ganhou a camada física explícita e o `recepcao.cpp` ganhou o caminho de cada receptor da `base_dupla` (`rylrAbrir` + origem + `tlmDecodificar` no SX1276; `+RCV` + origem + `tlmDecodificar` no RYLR998). O formato de saída não mudou (linha `TLM` da USB, registro de 80 bytes, colunas do dashboard), então o passo 4 deixou de ser necessário, e o `SIMULAR_FOGUETE` continua como antes. Receber com os dois ao mesmo tempo continua sendo papel da `base_dupla`. Compilado nos dois ambientes; falta o passo 5 (T5 em rádio com `foguete` e `base`/`base_reyax`).
+
 ### 11.8 O que foi verificado
 
 - **Compilação** (PlatformIO, espressif32 6.x, RadioLib 7.8.1), sem erros. O único aviso é o do RadioLib sobre USB CDC na ESP32-C3, que já existia:

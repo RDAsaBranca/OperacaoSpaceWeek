@@ -1,10 +1,21 @@
 // ============================================================
 //  FOGUETE - ESP32-C3 SuperMini
+//  (ou ESP32 DevKit V1 na bancada: ambiente foguete_devkit, pinos.h)
 //  BMP280 + BNO055 + ATGM336H + LoRa SX1276 + bateria (ADC)
 //
 //  Le os sensores a 50 Hz e transmite telemetria a cada
 //  TLM_PERIODO_MS. Nao ha armazenamento a bordo: o CanSat cai no
 //  mar e nao e recuperado, entao os dados vao todos pelo radio.
+//
+//  O PacoteTelemetria (64 bytes, Protocolo.h) vai no quadro que o
+//  REYAX RYLR998 aceita (QuadroReyax.h), o mesmo do teste_enlace/cansat_sim:
+//
+//     [dst_lo dst_hi src_lo src_hi len] + Base64(PacoteTelemetria)
+//      00     00     C5     00     58      88 caracteres  -> 93 bytes
+//
+//  Recebido pela teste_enlace/base_dupla (SX1276 + RYLR998). A base de
+//  voo (src/base) ainda espera a struct crua: so funciona depois da
+//  integracao dela (docs/arquitetura_enlace_reyax.md, secao 11.7).
 //
 //  Nenhuma falha de componente trava o firmware. O que nao responder
 //  fica marcado no status do pacote e no diagnostico, e o resto segue.
@@ -15,6 +26,7 @@
 #include <string.h>
 #include "ConfigLoRa.h"
 #include "Protocolo.h"
+#include "QuadroReyax.h"
 #include "pinos.h"
 #include "log.h"
 #include "radio_tx.h"
@@ -28,6 +40,7 @@ static const uint32_t PERIODO_RETENTAR_RADIO_MS = 5000; // se o SX1276 nao respo
 
 static LeituraSensores  leitura;
 static PacoteTelemetria pacoteTx;
+static uint8_t  quadroTx[RYLR_QUADRO_MAX];  // cabecalho Reyax + telemetria codificada
 static uint16_t seqTx = 0;       // sequencia dos pacotes de radio
 static uint32_t tSensores = 0, tTx = 0, tLog = 0, tRadio = 0;
 
@@ -73,12 +86,18 @@ static void prepararSpi() {
 
 static void iniciarRadio() {
   if (!radioIniciar()) return;
-  const uint32_t toaUs = radioTempoNoArUs(sizeof(PacoteTelemetria));
-  LOG("[LoRa] ok: %.1f MHz SF%d BW%.0f | pacote %u bytes | tempo no ar %.1f ms | periodo %d ms\n",
-      LORA_FREQ_MHZ, LORA_SF, LORA_BW_KHZ, (unsigned)sizeof(PacoteTelemetria),
-      toaUs / 1000.0f, TLM_PERIODO_MS);
-  if (toaUs / 1000 >= TLM_PERIODO_MS) {
-    LOG("[LoRa] AVISO: tempo no ar >= periodo. Aumente TLM_PERIODO_MS ou reduza o SF.\n");
+  LOG("[LoRa] ok: SX1276 configurado para o RYLR998\n");
+#if DIAGNOSTICO_USB
+  radioImprimirParametros(Serial);  // enlace, quadro de 93 B e tempo no ar (~168 ms)
+#endif
+}
+
+// Pacote dos sensores -> quadro Reyax -> radio. So conta o que foi ao ar.
+static void transmitirTelemetria() {
+  montarPacote(pacoteTx, seqTx);
+  const size_t n = quadroTelemetria(pacoteTx, quadroTx, sizeof(quadroTx));
+  if (n > 0 && radioEnviar(quadroTx, n)) {
+    seqTx++;
   }
 }
 
@@ -135,10 +154,7 @@ void loop() {
 
   if (radioPronto() && agora - tTx >= TLM_PERIODO_MS) {
     tTx = agora;
-    montarPacote(pacoteTx, seqTx);
-    if (radioEnviar(reinterpret_cast<const uint8_t*>(&pacoteTx), sizeof(pacoteTx))) {
-      seqTx++;  // so conta o que realmente foi ao ar
-    }
+    transmitirTelemetria();
   }
 
   if (agora - tLog >= PERIODO_LOG_MS) {

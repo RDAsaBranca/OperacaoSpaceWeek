@@ -1,5 +1,5 @@
 // comandos.h - comandos pela USB, usados em solo (monitor serial a 115200)
-//   info    estado do voo, dos sensores e do radio
+//   info    estado do voo, dos sensores e do radio (parametros do enlace e quadro)
 //   ajuda   lista os comandos
 // Durante SUBIDA e DESCIDA os comandos sao ignorados.
 #pragma once
