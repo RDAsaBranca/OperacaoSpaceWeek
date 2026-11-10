@@ -12,7 +12,7 @@
 //  Duas tarefas em paralelo:
 //   - recepcao (prioridade alta): le o receptor, valida, conta perdas
 //   - loop() (prioridade normal): rede Wi-Fi propria, dashboard,
-//     historico e gravacao sob demanda na memoria interna
+//     historico e gravacao na memoria interna (comeca no primeiro pacote)
 //
 //  Conecte na rede "EstacaoBase-Foguete" e abra http://192.168.4.1
 // ============================================================

@@ -53,9 +53,10 @@ static void jsonGravacao(String& json) {
   const StatusGravacao g = gravacaoStatus();
   char buf[220];
   snprintf(buf, sizeof(buf),
-           "{\"sistema_ok\":%s,\"ativa\":%s,\"cheia\":%s,\"registros\":%lu,"
-           "\"bytes\":%lu,\"livres\":%lu,\"duracao_s\":%lu}",
+           "{\"sistema_ok\":%s,\"ativa\":%s,\"automatica\":%s,\"cheia\":%s,"
+           "\"registros\":%lu,\"bytes\":%lu,\"livres\":%lu,\"duracao_s\":%lu}",
            g.sistemaOk ? "true" : "false", g.ativa ? "true" : "false",
+           g.automatica ? "true" : "false",
            g.cheia ? "true" : "false", (unsigned long)g.registros,
            (unsigned long)g.bytesArquivo, (unsigned long)g.bytesLivres,
            (unsigned long)g.duracaoS);

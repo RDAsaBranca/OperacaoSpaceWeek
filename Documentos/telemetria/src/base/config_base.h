@@ -40,3 +40,14 @@
 #ifndef SIMULAR_FOGUETE
 #define SIMULAR_FOGUETE 0
 #endif
+
+// ---- Gravacao automatica ----
+// 1 = a gravacao na memoria da base comeca sozinha no primeiro pacote valido
+// que o receptor entrega depois de ligar a base (pacote com CRC certo e
+// vindo do CanSat; ruido e quadros de outros nao contam). O botao "Parar
+// gravacao" desliga o inicio automatico ate a base ser religada.
+// Na simulacao fica desligada, para o voo ficticio nao se misturar com os
+// dados reais na memoria (o botao "Iniciar gravacao" continua funcionando).
+#ifndef GRAVAR_AO_RECEBER
+#define GRAVAR_AO_RECEBER (!SIMULAR_FOGUETE)
+#endif

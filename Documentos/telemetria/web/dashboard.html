@@ -272,7 +272,7 @@ h2 { font: 600 16px/1.2 var(--instr); margin: 0 0 12px; }
         <button id="grav-apagar" class="botao perigo" type="button">Apagar gravação</button>
       </div>
       <p id="grav-msg" class="msg" role="status"></p>
-      <p class="nota">A gravação fica na memória da base e continua mesmo se este aparelho desconectar. Para baixar ou apagar, pare a gravação.</p>
+      <p class="nota">A gravação começa sozinha quando a base recebe o primeiro pacote do foguete e continua mesmo se este aparelho desconectar. Para baixar ou apagar, pare a gravação. Parar também desliga o início automático até a base ser religada.</p>
       <hr class="separador">
       <button id="baixar-tela" class="botao" type="button">Baixar dados desta tela</button>
       <p class="nota">Salva neste aparelho os <span id="n-tela">0</span> pacotes recebidos desde que a página foi aberta.</p>
@@ -590,8 +590,14 @@ function atualizarGravacao() {
   let frase;
   if (!g.sistema_ok) frase = 'A memória interna da base não abriu. Reinicie a base.';
   else if (g.ativa) frase = 'Gravando há ' + mmss(g.duracao_s) + '. ' + fmt(g.registros, 0) + ' pacotes (' + tamanho(g.bytes) + ').';
-  else if (g.registros > 0) frase = 'Parada. ' + fmt(g.registros, 0) + ' pacotes guardados (' + tamanho(g.bytes) + ').';
-  else frase = 'Nada gravado ainda.';
+  else if (g.automatica) {
+    frase = 'Pronta: começa a gravar sozinha no primeiro pacote do foguete.';
+    if (g.registros > 0) frase += ' Já guardados de antes: ' + fmt(g.registros, 0) + ' pacotes (' + tamanho(g.bytes) + ').';
+  }
+  else if (g.registros > 0) frase = 'Parada. ' + fmt(g.registros, 0) + ' pacotes guardados (' + tamanho(g.bytes) + ').' +
+    (info && info.simulacao ? '' : ' Não volta a gravar sozinha até a base ser religada.');
+  else if (info && info.simulacao) frase = 'Nada gravado. Na simulação a gravação só começa pelo botão.';
+  else frase = 'Nada gravado. A gravação automática está desligada até a base ser religada.';
   if (g.sistema_ok) frase += ' Espaço livre: ' + tamanho(g.livres) + '.';
   texto('#grav-status', frase);
   $('#grav-iniciar').hidden = g.ativa;

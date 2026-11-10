@@ -2,6 +2,7 @@
 #include <LittleFS.h>
 #include <sys/time.h>
 #include <time.h>
+#include "config_base.h"
 
 // O nome leva a versao do pacote: registros de outra versao tem outro tamanho
 // e nao podem ser lidos com esta struct (o arquivo antigo fica intacto).
@@ -22,6 +23,8 @@ static_assert(sizeof(RegistroBase) == 80, "RegistroBase mudou de tamanho");
 static bool     sistemaOk = false;
 static File     arquivo;
 static bool     ativa = false, cheia = false;
+static bool     automatica = GRAVAR_AO_RECEBER;  // ligada a cada boot
+static bool     exportando = false;  // o CSV esta sendo lido: nao abre o arquivo para escrita
 static uint32_t registros = 0, tInicio = 0, tSync = 0, livres = 0;
 
 // Hora UTC atual em ms, ou 0 se o relogio nunca foi acertado pelo dashboard
@@ -62,7 +65,11 @@ bool gravacaoComecar() {
   return true;
 }
 
+// Quem para (o operador, a memoria cheia ou um erro de escrita) tambem desliga
+// o inicio automatico: senao o proximo pacote religaria a gravacao e nao daria
+// para baixar o CSV com o foguete transmitindo. Volta ao religar a base.
 void gravacaoParar() {
+  automatica = false;
   if (!ativa) return;
   arquivo.close();
   ativa = false;
@@ -79,7 +86,17 @@ bool gravacaoApagar() {
 }
 
 void gravacaoAnexar(const ItemRecebido& item) {
-  if (!ativa) return;
+  if (!ativa) {
+    // Pacote chegando com a gravacao parada durante o download do CSV fica de
+    // fora; o primeiro depois do download comeca a gravacao.
+    if (!automatica || exportando) return;
+    if (!gravacaoComecar()) {
+      automatica = false;  // memoria cheia ou com defeito: nao tenta a cada pacote
+      Serial.println("# [GRAVACAO] nao foi possivel comecar a gravacao automatica");
+      return;
+    }
+    Serial.printf("# [GRAVACAO] comecou sozinha no pacote seq %u\n", item.pacote.seq);
+  }
   RegistroBase r;
   r.pacote   = item.pacote;
   r.tBaseMs  = item.tBaseMs;
@@ -109,6 +126,7 @@ StatusGravacao gravacaoStatus() {
   StatusGravacao s;
   s.sistemaOk    = sistemaOk;
   s.ativa        = ativa;
+  s.automatica   = automatica && sistemaOk;
   s.cheia        = cheia;
   s.registros    = registros;
   s.bytesArquivo = registros * sizeof(RegistroBase);
@@ -131,6 +149,7 @@ void gravacaoExportarCsv(Print& saida) {
   if (!sistemaOk || !LittleFS.exists(ARQUIVO)) return;
   File f = LittleFS.open(ARQUIVO, FILE_READ);
   if (!f) return;
+  exportando = true;  // a saida drena a fila entre os blocos (gravacaoAnexar)
   RegistroBase r;
   char linha[320], hora[32];
   while (f.read(reinterpret_cast<uint8_t*>(&r), sizeof(r)) == sizeof(r)) {
@@ -140,4 +159,5 @@ void gravacaoExportarCsv(Print& saida) {
                  r.rssiDeci / 10.0, r.snrCenti / 100.0);
   }
   f.close();
+  exportando = false;
 }

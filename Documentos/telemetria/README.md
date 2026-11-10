@@ -3,7 +3,7 @@
 Um único projeto PlatformIO com dois firmwares e uma ferramenta para o PC:
 
 - **foguete** (ESP32-C3 SuperMini): lê BMP280, BNO055, GPS ATGM336H e bateria a 50 Hz, estima a fase do voo e transmite telemetria pelo SX1276 a 5 Hz, no quadro que o REYAX RYLR998 aceita (cabeçalho de 5 bytes + pacote em Base64, 93 bytes). Não há armazenamento a bordo: o CanSat cai no oceano e não é recuperado, então tudo que importa vai pelo rádio.
-- **base** (ESP32 + **um** receptor LoRa, nada mais): o receptor é o SX1276 (`pio run -e base`) ou o REYAX RYLR998 (`pio run -e base_reyax`), escolhido na compilação. Uma terceira opção é a placa Heltec WiFi LoRa 32 V2, que já traz o SX1276 (`pio run -e base_heltec`). Recebe o quadro do foguete, tira o cabeçalho Reyax, valida (CRC do LoRa + CRC próprio) e conta perdas. Também cria a própria rede Wi-Fi e serve um **dashboard** que abre no navegador de qualquer celular ou notebook, sem internet. Pelo dashboard dá para acompanhar o voo ao vivo e gravar os dados na memória da base quando for pedido. Para ouvir com os dois receptores ao mesmo tempo, use a `base_dupla` do `teste_enlace/`.
+- **base** (ESP32 + **um** receptor LoRa, nada mais): o receptor é o SX1276 (`pio run -e base`) ou o REYAX RYLR998 (`pio run -e base_reyax`), escolhido na compilação. Uma terceira opção é a placa Heltec WiFi LoRa 32 V2, que já traz o SX1276 (`pio run -e base_heltec`). Recebe o quadro do foguete, tira o cabeçalho Reyax, valida (CRC do LoRa + CRC próprio) e conta perdas. Também cria a própria rede Wi-Fi e serve um **dashboard** que abre no navegador de qualquer celular ou notebook, sem internet. Pelo dashboard dá para acompanhar o voo ao vivo. A base grava os dados na própria memória a partir do primeiro pacote recebido, sem precisar de ninguém no dashboard. Para ouvir com os dois receptores ao mesmo tempo, use a `base_dupla` do `teste_enlace/`.
 - **ferramentas/registrar_serial.py** (opcional): grava no PC a cópia que a base também envia pela USB.
 - **teste_enlace/** (projeto separado): teste do enlace com um segundo receptor na base, o REYAX RYLR998. Tem um CanSat simulado que transmite o pacote real com dados fictícios e uma base que recebe pelo SX1276 e pelo RYLR998 ao mesmo tempo. Ver `teste_enlace/README.md` e `docs/arquitetura_enlace_reyax.md`.
 
@@ -48,7 +48,7 @@ telemetria-foguete/
 │   ├── reyax_rx.*            receptor RYLR998: configuração AT e leitura do +RCV (só no [env:base_reyax])
 │   ├── recepcao.*            tarefa do receptor: tira o cabeçalho Reyax, valida, conta perdas, simulação
 │   ├── servidor_web.*        rede Wi-Fi própria, dashboard e API
-│   ├── gravacao.*            gravação sob demanda na memória interna
+│   ├── gravacao.*            gravação na memória interna, a partir do primeiro pacote
 │   ├── saida.*               cópia em texto pela USB
 │   └── dashboard_html.h      GERADO a partir de web/dashboard.html
 ├── web/
@@ -247,7 +247,7 @@ Quem abre o dashboard no meio do voo recebe os últimos 2 minutos que a base gua
 
 **Salvar os dados**, de duas formas:
 
-- **Gravação na estação base:** os botões "Iniciar gravação" e "Parar gravação" guardam os pacotes na memória interna da ESP32 (cerca de 75 minutos a 5 Hz). A gravação continua mesmo se o celular desconectar ou a tela apagar. Depois de parar, "Baixar CSV" entrega o arquivo com a hora UTC de cada pacote (a base acerta o relógio pelo celular) e "Apagar gravação" libera o espaço.
+- **Gravação na estação base:** começa sozinha quando o receptor entrega o primeiro pacote válido depois de ligar a base: CRC certo e vindo do CanSat. Ruído e quadros de outros transmissores não disparam a gravação. Ela guarda os pacotes na memória interna da ESP32 (cerca de 75 minutos a 5 Hz) e continua mesmo se o celular desconectar ou a tela apagar. Se a base reiniciar no meio do voo, a gravação recomeça no próximo pacote, no fim do mesmo arquivo. "Parar gravação" fecha o arquivo e desliga o início automático até a base ser religada; sem isso, o pacote seguinte religaria a gravação e não daria para baixar com o foguete ainda transmitindo. "Iniciar gravação" grava na hora, a qualquer momento. Depois de parar, "Baixar CSV" entrega o arquivo e "Apagar gravação" libera o espaço. A hora UTC de cada pacote só aparece no CSV depois que algum celular abriu o dashboard, porque é ele que acerta o relógio da base. Antes disso, a coluna `hora_utc` fica vazia, mas o `t_base_ms` vale sempre. Com `-DGRAVAR_AO_RECEBER=0` volta o comportamento antigo, só pelos botões. Na simulação, o início automático já vem desligado.
 - **Baixar dados desta tela:** salva no aparelho tudo o que a página recebeu desde que foi aberta. Serve de reserva se ninguém lembrou de iniciar a gravação.
 
 Por dentro, a base roda duas tarefas em paralelo:
@@ -299,7 +299,7 @@ Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma
 1. Com o ambiente `foguete` gravado, confira no monitor serial que BMP280, BNO055, GPS, bateria e LoRa aparecem como `ok` no bloco de diagnóstico.
 2. Confira no dashboard que nenhum sistema aparece com falha.
 3. Teste de bancada com os dois lados ligados: no dashboard, a perda deve ficar perto de 0%.
-4. Faça uma gravação de teste na base, baixe o CSV e apague, para conferir o fluxo antes do dia.
+4. Faça uma gravação de teste na base, baixe o CSV e apague, para conferir o fluxo antes do dia. Como a base grava sozinha todo pacote que recebe, cada teste de bancada fica guardado no mesmo arquivo. **No dia, antes de ligar o foguete, baixe e apague o que sobrou dos testes** e confira no dashboard o espaço livre e a frase "começa a gravar sozinha no primeiro pacote".
 5. Teste de alcance no solo com o foguete montado e a antena na posição de voo. O dashboard mostra a "folga até o limite" do receptor; procure ter uns 20 dB na distância esperada.
 6. Levante o foguete 1 a 2 m e veja a altitude responder na base.
 7. Deixe o foguete ligado pelo tempo de espera previsto na rampa, para testar a bateria e o módulo de alimentação.
