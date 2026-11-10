@@ -119,6 +119,7 @@ void setup() {
   delay(1500);  // tempo para o USB-CDC da C3 enumerar no PC
 #endif
   LOG("\n=== FOGUETE: telemetria LoRa SX1276 ===\n");
+  LOG("# pinos: %s\n", PINOS_NOME);
 
   prepararSpi();
   sensoresIniciar();

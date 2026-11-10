@@ -1,15 +1,27 @@
 // pinos.h - mapa de pinos e opcoes de hardware do foguete
 //
-// Padrao: a placa de voo, ESP32-C3 SuperMini, seguindo o esquematico
-// hardware/backup_projetos/Projeto_V1_7.epro2 (PCB V1.7). O nome entre
-// parenteses e o nome da net no esquematico.
-//
-// Com -DPLACA_DEVKIT=1 (ambiente foguete_devkit): ESP32 DevKit V1, so para
-// bancada. O SX1276 fica no VSPI, ligado como na estacao base.
+// Tres mapas, escolhidos pelo ambiente do platformio.ini:
+//   foguete, foguete_voo             C3 SuperMini, mapa padrao (CS do radio
+//                                    no GPIO7, GPS em 20/21)
+//   foguete_pcb17, foguete_pcb17_voo C3 SuperMini ligada como nos arquivos da
+//                                    PCB V1.6/V1.7 em hardware/ (CS do radio no
+//                                    GPIO3, GPS em 10/20): -DPINOS_PCB_V17=1
+//   foguete_devkit                   ESP32 DevKit V1, so bancada: -DPLACA_DEVKIT=1
+// Os dois mapas da C3 so diferem no CS do radio e nos dois pinos do GPS.
+// O nome entre parenteses e o nome da net nos arquivos da PCB.
 #pragma once
+
+#ifndef PINOS_PCB_V17
+#define PINOS_PCB_V17 0
+#endif
+
+#if PLACA_DEVKIT && PINOS_PCB_V17
+#error "PINOS_PCB_V17 e so para a C3 SuperMini, nao para a DevKit"
+#endif
 
 #if PLACA_DEVKIT
 // ================= ESP32 DevKit V1 (bancada) =================
+#define PINOS_NOME      "ESP32 DevKit V1 (bancada)"
 // Os pinos da C3 nao servem aqui: na ESP32 classica os GPIO6-11 sao da flash
 // interna (travam a placa), o GPIO1 e o TX do Serial e o GPIO0 decide o boot.
 
@@ -37,7 +49,27 @@
 #define VBAT_FATOR_DIVISOR  2.0f
 
 #else
-// ================= ESP32-C3 SuperMini (placa de voo, PCB V1.7) =================
+// ================= ESP32-C3 SuperMini (placa de voo) =================
+
+// ---- Os 3 pinos que mudam entre os dois mapas da C3 ----
+#if PINOS_PCB_V17
+// Como nos arquivos hardware/backup_pcbs/PCB1_6.epro2, PCB1_7.epro2 e
+// hardware/backup_projetos/Projeto_V1_7.epro2: o NSS do SX1276 (pad 5) vai na
+// net CS2, pad 12 da C3. O GPIO7 (net CS1) vai para o CS da W25Q128, que nao
+// e soldada; o firmware nao mexe nele.
+#define PINOS_NOME      "C3 SuperMini, PCB V1.7 (CS2/GPIO3, GPS 10/20)"
+#define PIN_LORA_NSS    3   // (CS2)    CS do radio
+#define PIN_GPS_RX      10  // (ESP_RX) ligado no TX do GPS
+#define PIN_GPS_TX      20  // (ESP_TX) ligado no RX do GPS
+#else
+// Mapa padrao. Atencao: NAO e o dos arquivos da PCB em hardware/ (la o CS do
+// radio esta no GPIO3 e o GPS em 10/20; use o foguete_pcb17 para essa placa).
+// Na PCB, o GPIO7 e a net CS1 (CS da W25Q128) e o GPIO21 nao tem net.
+#define PINOS_NOME      "C3 SuperMini, mapa padrao (GPIO7, GPS 20/21)"
+#define PIN_LORA_NSS    7   // CS do radio
+#define PIN_GPS_RX      20  // ligado no TX do GPS
+#define PIN_GPS_TX      21  // ligado no RX do GPS
+#endif
 
 // ---- SPI: LoRa SX1276 ----
 #define PIN_SPI_SCK     4   // (SCK)
@@ -45,7 +77,6 @@
 #define PIN_SPI_MOSI    6   // (MOSI)
 
 // LoRa SX1276
-#define PIN_LORA_NSS    7   // (CS1)   CS do radio
 #define PIN_LORA_RST    2   // (RESET) GPIO2 e pino de strapping, ver nota no fim (sem problema)
 #define PIN_LORA_DIO0   0   // (INTER) interrupcao de fim de transmissao
 
@@ -55,8 +86,6 @@
 #define I2C_FREQ_HZ     100000  // o BNO055 usa clock stretching: 100 kHz e o mais seguro
 
 // ---- GPS ATGM336H-5N-31 (UART1, NMEA a 9600 baud por padrao) ----
-#define PIN_GPS_RX      20  // (ESP_RX) ligado no TX do GPS
-#define PIN_GPS_TX      21  // (ESP_TX) ligado no RX do GPS
 #define GPS_BAUD        9600
 
 // ---- Bateria NCR18650B (Li-ion 1S: 4,2 V cheia, ~3,0 V vazia) ----

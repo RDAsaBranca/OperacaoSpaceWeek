@@ -26,7 +26,7 @@ Um único projeto PlatformIO com dois firmwares e uma ferramenta para o PC:
 
 ```
 telemetria-foguete/
-├── platformio.ini            ambientes [env:foguete], [env:foguete_voo], [env:foguete_devkit], [env:base], [env:base_reyax] e [env:base_heltec]
+├── platformio.ini            ambientes [env:foguete], [env:foguete_voo], [env:foguete_pcb17], [env:foguete_pcb17_voo], [env:foguete_devkit], [env:base], [env:base_reyax] e [env:base_heltec]
 ├── lib/Telemetria/           CÓDIGO COMPARTILHADO (compilado nos dois)
 │   ├── ConfigLoRa.h          frequência, SF, BW, sync word, preâmbulo (compatíveis com o RYLR998)
 │   ├── Protocolo.h           pacote de 64 bytes (versão 3), estados, bits de status
@@ -34,7 +34,7 @@ telemetria-foguete/
 │   └── QuadroReyax.*         quadro do RYLR998: cabeçalho de 5 bytes + Base64 do pacote
 ├── src/foguete/              ESP32-C3 SuperMini
 │   ├── main.cpp              agendador: sensores 50 Hz, TX a cada 200 ms, diagnóstico 1 Hz
-│   ├── pinos.h               mapa de pinos (esquemático V1.7 ou DevKit de bancada) e modo do BNO055
+│   ├── pinos.h               mapas de pinos (C3 padrão, C3 como na PCB V1.7, DevKit de bancada) e modo do BNO055
 │   ├── log.h                 diagnóstico USB (desligável para o voo)
 │   ├── radio_tx.*            transmissão LoRa não bloqueante (camada física do RYLR998)
 │   ├── sensores.*            BMP280, BNO055, ATGM336H, bateria
@@ -65,26 +65,30 @@ Tudo que precisa ser igual nos dois lados (rádio e formato do pacote) fica em `
 
 ## Ligações do foguete (ESP32-C3 SuperMini)
 
-Os pinos seguem o esquemático da PCB V1.7 (`hardware/backup_projetos/Projeto_V1_7.epro2`). O SX1276 usa o SPI e o BMP280 e o BNO055 dividem o I2C.
+A mesma C3 SuperMini e os mesmos componentes têm dois mapas de pinos, cada um com seus ambientes. Eles só diferem no CS do rádio e nos dois pinos do GPS. O SX1276 usa o SPI, e o BMP280 e o BNO055 dividem o I2C.
 
-| Função | Componente / pino | Net no esquemático | GPIO da C3 |
-|---|---|---|---|
-| SPI SCK | SX1276 SCK | SCK | 4 |
-| SPI MISO | SX1276 SO | MISO | 5 |
-| SPI MOSI | SX1276 SI | MOSI | 6 |
-| CS do rádio | SX1276 NSS | CS2 | 3 |
-| Reset do rádio | SX1276 RST | RESET | 2 |
-| Interrupção do rádio | SX1276 DIO0 | INTER | 0 |
-| I2C SDA | BMP280 SDA + BNO055 SDA | SDA | 8 |
-| I2C SCL | BMP280 SCL + BNO055 SCL | SCL | 9 |
-| GPS TX → ESP RX | ATGM336H TX | ESP_RX | 10 |
-| GPS RX ← ESP TX | ATGM336H RX | ESP_TX | 20 |
-| Tensão da bateria | divisor 100k/100k a partir do B+ | V_Bat | 1 |
-| (livre) | CS da W25Q128, que não é soldada | CS1 | 7 |
+- **`foguete` / `foguete_voo`** (mapa padrão): CS do rádio no GPIO7 e GPS em 20/21.
+- **`foguete_pcb17` / `foguete_pcb17_voo`**: ligada como nos arquivos da PCB V1.6/V1.7 em `hardware/` (`backup_pcbs/PCB1_6.epro2`, `PCB1_7.epro2` e `backup_projetos/Projeto_V1_7.epro2`). Nos três, o NSS do SX1276 vai na net CS2, que é o GPIO3, e o GPS fica nas nets ESP_RX/ESP_TX, nos GPIO10/20.
+
+| Função | Componente / pino | Net na PCB V1.7 | GPIO (`foguete`) | GPIO (`foguete_pcb17`) |
+|---|---|---|---|---|
+| SPI SCK | SX1276 SCK | SCK | 4 | 4 |
+| SPI MISO | SX1276 SO | MISO | 5 | 5 |
+| SPI MOSI | SX1276 SI | MOSI | 6 | 6 |
+| **CS do rádio** | SX1276 NSS | CS2 | **7** | **3** |
+| Reset do rádio | SX1276 RST | RESET | 2 | 2 |
+| Interrupção do rádio | SX1276 DIO0 | INTER | 0 | 0 |
+| I2C SDA | BMP280 SDA + BNO055 SDA | SDA | 8 | 8 |
+| I2C SCL | BMP280 SCL + BNO055 SCL | SCL | 9 | 9 |
+| **GPS TX → ESP RX** | ATGM336H TX | ESP_RX | **20** | **10** |
+| **GPS RX ← ESP TX** | ATGM336H RX | ESP_TX | **21** | **20** |
+| Tensão da bateria | divisor 100k/100k a partir do B+ | V_Bat | 1 | 1 |
+
+Na PCB V1.7, o GPIO7 é a net CS1 (CS da W25Q128) e o GPIO21 não tem net. Então o mapa padrão não serve numa placa montada exatamente como os arquivos da PCB: para essa placa, grave o `foguete_pcb17`. O comando `info` pela USB e a primeira linha do diagnóstico mostram qual mapa está gravado (`# pinos: ...`).
 
 Detalhes que costumam dar problema:
 
-- **W25Q128:** não é usada e não deve ser soldada. O firmware não mexe no GPIO7. Se um dia ela for soldada sem ser usada, o /CS dela precisa ficar em nível alto, senão ela responde no MISO junto com o rádio.
+- **W25Q128:** não é usada e não deve ser soldada. No `foguete_pcb17` o firmware não mexe no GPIO7 (net CS1). Se um dia ela for soldada sem ser usada, o /CS dela precisa ficar em nível alto, senão ela responde no MISO junto com o rádio.
 - **GPIO2 (reset do rádio):** é pino de *strapping* da C3, mas pelo datasheet (v2.4, Tabela 3-3, nota 2) ele não define o modo de boot. A Espressif só recomenda um pull-up contra ruído, então ligá-lo ao RESET do SX1276 não impede a placa de ligar.
 - **BMP280 de 5 V (4 pinos):** alimente o VIN com **3,3 V**. Esse módulo tem regulador próprio e funciona assim, e isso garante que os resistores de pull-up do I2C fiquem em 3,3 V. Se ele for ligado em 5 V, meça SDA e SCL em repouso: acima de 3,6 V pode danificar a ESP32-C3.
 - **BNO055:** pelo mesmo motivo, alimente com 3,3 V. O firmware procura o sensor em 0x28 e 0x29 (as placas GY-BNO055 costumam vir em 0x29).
@@ -103,7 +107,7 @@ Para testar o firmware do foguete sem a placa de voo, grave o ambiente `foguete_
 | GPS TX → ESP RX / GPS RX ← ESP TX | ATGM336H | 16 / 17 |
 | Tensão da bateria (opcional) | divisor 100k/100k | 34 |
 
-O SX1276 fica nos mesmos pinos da estação base. Nunca grave o `foguete_devkit` na C3 SuperMini, nem o `foguete`/`foguete_voo` na DevKit.
+O SX1276 fica nos mesmos pinos da estação base. Nunca grave o `foguete_devkit` na C3 SuperMini, nem os ambientes da C3 (`foguete`, `foguete_pcb17` e os `_voo`) na DevKit.
 
 ## Alimentação (EPS)
 
@@ -171,6 +175,8 @@ Com o VS Code + extensão PlatformIO, abra a pasta do projeto e use:
 ```
 pio run -e foguete -t upload       grava o foguete para testes (com diagnóstico)
 pio run -e foguete_voo -t upload   grava o foguete para o lançamento
+pio run -e foguete_pcb17 -t upload grava o foguete ligado como na PCB V1.7 (CS no GPIO3, GPS 10/20), para testes
+pio run -e foguete_pcb17_voo -t upload  o mesmo, para o lançamento
 pio run -e foguete_devkit -t upload grava o foguete numa ESP32 DevKit V1 (só bancada)
 pio device monitor -e foguete      vê o diagnóstico do foguete
 pio run -e base -t upload          grava a base com o SX1276
@@ -304,7 +310,7 @@ Além do dashboard, a base envia tudo pela USB. Linhas `TLM,...` são dados (uma
 6. Levante o foguete 1 a 2 m e veja a altitude responder na base.
 7. Deixe o foguete ligado pelo tempo de espera previsto na rampa, para testar a bateria e o módulo de alimentação.
 8. Ajuste os limiares de `estado_voo.cpp` para o seu motor.
-9. Grave o foguete com `pio run -e foguete_voo -t upload` para o voo.
+9. Grave o foguete com `pio run -e foguete_voo -t upload` para o voo, ou com `foguete_pcb17_voo` se a placa estiver ligada como na PCB V1.7. Confira com o comando `info` a linha `# pinos: ...`.
 
 ## Cuidados
 

@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <string.h>
 #include "estado_voo.h"
+#include "pinos.h"
 #include "radio_tx.h"
 #include "sensores.h"
 
@@ -14,6 +15,7 @@ static void ajuda() {
 }
 
 static void info() {
+  Serial.println("# pinos: " PINOS_NOME);  // confira se gravou o ambiente da sua placa
   Serial.printf("# estado do voo: %s\n", nomeEstado(estadoVooAtual()));
   sensoresImprimirResumo(Serial);
   Serial.print("# ");
